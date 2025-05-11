@@ -18,7 +18,7 @@
     "tracking"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "description": "A tool to track Terraform modules used in GitHub repositories",
   "dependencies": {
     "@octokit/core": "^6.1.5",
