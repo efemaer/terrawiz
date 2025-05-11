@@ -1,0 +1,35 @@
+{
+  "name": "terrawiz",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "bin": {
+    "terrawiz": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "terraform",
+    "github",
+    "modules",
+    "tracking"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "A tool to track Terraform modules used in GitHub repositories",
+  "dependencies": {
+    "@octokit/core": "^6.1.5",
+    "@octokit/plugin-throttling": "^10.0.0",
+    "@octokit/rest": "^21.1.1",
+    "commander": "^13.1.0",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
