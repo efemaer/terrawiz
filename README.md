@@ -70,6 +70,7 @@ terrawiz scan --org <organization> [options]
 
 - `--org <organization>`: **Required**. GitHub organization or user name
 - `--repo <repository>`: Specific repository name (if not provided, will search the entire organization)
+- `--repo-pattern <regex>`: Filter repositories by name using regex pattern
 - `--format <format>`: Output format: json, csv, or table (default: table)
 - `--output <filepath>`: Export results to specified file
 - `--debug`: Enable debug logging
@@ -97,6 +98,15 @@ terrawiz scan --org myorg --repo myrepo --format json --output results.json
 Limit search to a specific number of repositories:
 ```bash
 terrawiz scan --org myorg --max-repos 5
+```
+
+Filter repositories using regex pattern:
+```bash
+# Match repos that start with "terraform-"
+terrawiz scan --org myorg --repo-pattern "^terraform-"
+
+# Match repos containing "service" anywhere in the name
+terrawiz scan --org myorg --repo-pattern "service" --format json --output service-modules.json
 ```
 
 Scan with debug logging enabled (for troubleshooting):

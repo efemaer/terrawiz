@@ -27,6 +27,7 @@ program
     .description('Scan and analyze Terraform modules in GitHub repositories')
     .requiredOption('--org <organization>', 'GitHub organization or user name')
     .option('--repo <repository>', 'Specific repository name (if not provided, will search the entire organization)')
+    .option('--repo-pattern <regex>', 'Filter repositories by name using regex pattern')
     .option('--format <format>', 'Output format: json, csv, or table (default: table)', 'table')
     .option('--output <filepath>', 'Export results to specified file')
     .option('--debug', 'Enable debug logging')
@@ -52,6 +53,18 @@ program
                 logger.info(`Limiting search to ${maxRepos} repositor${maxRepos === 1 ? 'y' : 'ies'}`);
             }
 
+            // Validate repository pattern
+            if (options.repoPattern) {
+                try {
+                    new RegExp(options.repoPattern);
+                    logger.info(`Using repository filter pattern: ${options.repoPattern}`);
+                } catch (error) {
+                    logger.error(`Invalid repository pattern regex: ${options.repoPattern}`);
+                    logger.errorWithStack('Regex error', error as Error);
+                    process.exit(1);
+                }
+            }
+
             // Fixed perPage to 100 (max allowed by GitHub API)
             const perPage = 100;
 
@@ -59,14 +72,15 @@ program
             const githubServiceOptions: GitHubServiceOptions = {
                 debug: options.debug,
                 useRateLimit: options.rateLimit !== false,
-                skipArchived: options.skipArchived
+                skipArchived: options.skipArchived,
+                repoPattern: options.repoPattern
             };
 
             // Initialize services
             const githubService = new GitHubService(githubServiceOptions);
             const terraformParser = new TerraformParser();
 
-            logger.info(`Scanning for Terraform files in ${options.org}${options.repo ? `/${options.repo}` : ''}`);
+            logger.info(`Scanning for Terraform files in ${options.org}${options.repo ? `/${options.repo}` : ''}${options.repoPattern ? ` (filtering by pattern: ${options.repoPattern})` : ''}`);
 
             // Get Terraform files using the repository tree approach
             logger.info('Getting repositories and extracting Terraform files...');
@@ -97,6 +111,7 @@ program
                 metadata: {
                     owner: options.org,
                     repository: options.repo || 'All repositories',
+                    repoPattern: options.repoPattern || undefined,
                     timestamp: new Date().toISOString(),
                     moduleCount: modules.length,
                     fileCount: files.length
@@ -124,10 +139,11 @@ program
                         '\nTerraform Module Usage Report',
                         '============================',
                         `Scope: ${options.org}${options.repo ? `/${options.repo}` : ' (organization)'}`,
+                        options.repoPattern ? `Repository filter: ${options.repoPattern}` : '',
                         `Total modules found: ${modules.length}`,
                         `Total files analyzed: ${files.length}`,
                         '\nModule Summary by Source:'
-                    ];
+                    ].filter(Boolean);
 
                     // Sort by frequency
                     const sortedSources = Object.entries(summary)
