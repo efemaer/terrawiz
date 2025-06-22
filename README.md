@@ -235,4 +235,4 @@ Please ensure your code follows the existing style patterns and includes appropr
 
 ## Star History
 
-[Star History Chart](https://api.star-history.com/svg?repos=efemaer/terrawiz&type=Date)
+![Star History Chart](https://api.star-history.com/svg?repos=efemaer/terrawiz&type=Date)
