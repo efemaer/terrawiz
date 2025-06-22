@@ -8,7 +8,7 @@ TerraWiz scans GitHub repositories to identify Terraform and Terragrunt files an
 
 Key features:
 - Scan entire GitHub organizations or specific repositories
-- Support for both Terraform (.tf) and Terragrunt (terragrunt.hcl) files
+- Support for both Terraform (.tf) and Terragrunt (.hcl) files
 - Detection of various module source types including git, registry, local, and artifactory
 - Version tracking and analysis of module dependencies
 - Flexible output formats (JSON, CSV, table)
@@ -167,7 +167,7 @@ Displays a human-readable summary with:
 TerraWiz works by:
 1. Retrieving all repositories in an organization or user account
 2. For each repository, getting the file tree from the default branch
-3. Filtering files with .tf extension (Terraform) and terragrunt.hcl files (Terragrunt)
+3. Filtering files with .tf (Terraform) and .hcl (Terragrunt) files
 4. Parsing each file to extract module declarations:
    - For Terraform files: module blocks with source attributes
    - For Terragrunt files: terraform blocks with source attributes
@@ -216,9 +216,7 @@ This architecture ensures consistent handling of different IaC file types while 
   - registry: Terraform Registry modules (e.g., "terraform-aws-modules/vpc/aws")
   - git: Git repositories (prefixed with "git::" or containing "github.com"/"gitlab.com")
   - unknown: Any other source format
-- Terragrunt files are identified by the extension .hcl and either:
-  - File named exactly "terragrunt.hcl"
-  - Located in a directory with "terragrunt" in the path
+- Terragrunt files are identified by the extension .hcl, which may include some false positives
 
 ## Contributing
 

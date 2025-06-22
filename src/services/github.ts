@@ -374,9 +374,7 @@ export class GitHubService {
 
             // Define predicates for different IaC file types
             const isTerraformFile = (path?: string) => path?.endsWith('.tf');
-            const isTerragruntFile = (path?: string) =>
-                path?.endsWith('.hcl') &&
-                (path.endsWith('terragrunt.hcl') || path.includes('/terragrunt/'));
+            const isTerragruntFile = (path?: string) => path?.endsWith('.hcl');
 
             // Filter for specified IaC file types
             const iacFiles: { path: string; url: string; sha: string; type: IacFileType }[] = tree.data.tree
