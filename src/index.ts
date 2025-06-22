@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { program } from 'commander';
-import { GitHubService, GitHubServiceOptions } from './services/github';
-import { TerraformParser } from './parsers/terraform';
+import { GitHubService, GitHubServiceOptions, IacFile, IacFileType } from './services/github';
+import { TerraformParser, TerraformModule } from './parsers/terraform';
+import { TerragruntParser, TerragruntModule } from './parsers/terragrunt';
+import { IaCModule } from './parsers/base-parser';
 import { Logger, LogLevel } from './services/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,7 +26,7 @@ program
 
 program
     .command('scan')
-    .description('Scan and analyze Terraform modules in GitHub repositories')
+    .description('Scan and analyze Infrastructure as Code modules in GitHub repositories')
     .requiredOption('--org <organization>', 'GitHub organization or user name')
     .option('--repo <repository>', 'Specific repository name (if not provided, will search the entire organization)')
     .option('--repo-pattern <regex>', 'Filter repositories by name using regex pattern')
@@ -34,6 +36,8 @@ program
     .option('--max-repos <number>', 'Maximum number of repositories to process')
     .option('--no-rate-limit', 'Disable rate limit protection')
     .option('--skip-archived', 'Skip archived repositories (default: true)', true)
+    .option('--terraform-only', 'Only scan for Terraform files')
+    .option('--terragrunt-only', 'Only scan for Terragrunt files')
     .action(async (options) => {
         try {
             // Configure logging based on debug flag
@@ -68,43 +72,94 @@ program
             // Fixed perPage to 100 (max allowed by GitHub API)
             const perPage = 100;
 
+            // Validate IaC file types options
+            if (options.terraformOnly && options.terragruntOnly) {
+                logger.error('Error: Cannot specify both --terraform-only and --terragrunt-only. Use neither to scan both.');
+                process.exit(1);
+            }
+
+            // Determine which IaC file types to scan
+            let iacFileTypes: Array<'terraform' | 'terragrunt'> = ['terraform', 'terragrunt'];
+            if (options.terraformOnly) {
+                iacFileTypes = ['terraform'];
+            } else if (options.terragruntOnly) {
+                iacFileTypes = ['terragrunt'];
+            }
+
             // Configure GitHub service
             const githubServiceOptions: GitHubServiceOptions = {
                 debug: options.debug,
                 useRateLimit: options.rateLimit !== false,
                 skipArchived: options.skipArchived,
-                repoPattern: options.repoPattern
+                repoPattern: options.repoPattern,
+                iacFileTypes
             };
 
             // Initialize services
             const githubService = new GitHubService(githubServiceOptions);
             const terraformParser = new TerraformParser();
 
-            logger.info(`Scanning for Terraform files in ${options.org}${options.repo ? `/${options.repo}` : ''}${options.repoPattern ? ` (filtering by pattern: ${options.repoPattern})` : ''}`);
+            // Log what we're scanning for
+            const fileTypesDescription = options.terraformOnly
+                ? 'Terraform files'
+                : options.terragruntOnly
+                    ? 'Terragrunt files'
+                    : 'Terraform and Terragrunt files';
 
-            // Get Terraform files using the repository tree approach
-            logger.info('Getting repositories and extracting Terraform files...');
-            const files = await githubService.findTerraformFiles(options.org, options.repo, maxRepos, perPage);
+            logger.info(`Scanning for ${fileTypesDescription} in ${options.org}${options.repo ? `/${options.repo}` : ''}${options.repoPattern ? ` (filtering by pattern: ${options.repoPattern})` : ''}`);
+
+            // Get IaC files using the repository tree approach
+            logger.info(`Getting repositories and extracting ${fileTypesDescription}...`);
+            const files = await githubService.findIacFiles(options.org, options.repo, maxRepos, perPage);
 
             if (files.length === 0) {
-                logger.info('No Terraform files found');
+                logger.info(`No ${fileTypesDescription} found`);
                 return;
             }
 
-            logger.info(`Found ${files.length} Terraform files. Analyzing module usage...`);
+            // Count by type
+            const terraformFileCount = files.filter(f => f.type === 'terraform').length;
+            const terragruntFileCount = files.filter(f => f.type === 'terragrunt').length;
+            logger.info(
+                `Found ${files.length} IaC files: ${terraformFileCount} Terraform, ` +
+                `${terragruntFileCount} Terragrunt. Analyzing module usage...`
+            );
 
-            // Extract module information
-            const modules = terraformParser.parseModules(files);
+            // Initialize parsers for each type if needed
+            const terragruntParser = new TerragruntParser();
 
-            if (modules.length === 0) {
-                logger.info('No Terraform modules found');
+            // Extract module information based on file type
+            const terraformModules = terraformFileCount > 0 ? terraformParser.parseModules(
+                files.filter(f => f.type === 'terraform')
+            ) : [];
+
+            const terragruntModules = terragruntFileCount > 0 ? terragruntParser.parseModules(
+                files
+            ) : [];
+
+            // Check module counts
+            if (terraformModules.length === 0 && terragruntModules.length === 0) {
+                logger.info('No modules found in any files');
                 return;
             }
 
-            logger.info(`Found ${modules.length} Terraform module references`);
+            logger.info(
+                `Found ${terraformModules.length + terragruntModules.length} module references ` +
+                `(${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
+            );
 
-            // Create summary
-            const summary = terraformParser.createModuleSummary(modules);
+            // Create summaries
+            const terraformSummary = terraformModules.length > 0 ? terraformParser.createModuleSummary(terraformModules) : {};
+            const terragruntSummary = terragruntModules.length > 0 ? terragruntParser.createModuleSummary(terragruntModules) : {};
+
+            // Combine modules for output
+            const allModules: IaCModule[] = [...terraformModules, ...terragruntModules];
+
+            // Combine summaries
+            const combinedSummary = {
+                ...terraformSummary,
+                ...terragruntSummary
+            };
 
             // Output results
             const result = {
@@ -113,11 +168,15 @@ program
                     repository: options.repo || 'All repositories',
                     repoPattern: options.repoPattern || undefined,
                     timestamp: new Date().toISOString(),
-                    moduleCount: modules.length,
-                    fileCount: files.length
+                    moduleCount: allModules.length,
+                    fileCount: files.length,
+                    terraformModuleCount: terraformModules.length,
+                    terragruntModuleCount: terragruntModules.length,
+                    terraformFileCount: terraformFileCount,
+                    terragruntFileCount: terragruntFileCount
                 },
-                modules,
-                summary
+                modules: allModules,
+                summary: combinedSummary
             };
 
             // Prepare the output data based on format
@@ -127,31 +186,42 @@ program
                     outputData = JSON.stringify(result, null, 2);
                     break;
                 case 'csv':
-                    outputData = 'module,source_type,version,repository,file_path,line_number,github_link\n' +
-                        modules.map(m => {
+                    outputData = 'module,source_type,file_type,version,repository,file_path,line_number,github_link\n' +
+                        allModules.map(m => {
                             const githubLink = `${m.fileUrl}#L${m.lineNumber}`;
-                            return `"${m.source}","${m.sourceType}","${m.version || ''}","${m.repository}","${m.filePath}",${m.lineNumber},"${githubLink}"`;
+                            const fileType = terraformModules.includes(m as any) ? 'terraform' : 'terragrunt';
+                            return `"${m.source}","${m.sourceType}","${fileType}","${m.version || ''}","${m.repository}","${m.filePath}",${m.lineNumber},"${githubLink}"`;
                         }).join('\n');
                     break;
                 case 'table':
                 default:
+                    const fileTypeStr = options.terraformOnly
+                        ? 'Terraform'
+                        : options.terragruntOnly
+                            ? 'Terragrunt'
+                            : 'Infrastructure as Code';
+
                     const tableLines = [
-                        '\nTerraform Module Usage Report',
+                        `\n${fileTypeStr} Module Usage Report`,
                         '============================',
                         `Scope: ${options.org}${options.repo ? `/${options.repo}` : ' (organization)'}`,
                         options.repoPattern ? `Repository filter: ${options.repoPattern}` : '',
-                        `Total modules found: ${modules.length}`,
-                        `Total files analyzed: ${files.length}`,
+                        `Total modules found: ${allModules.length}` +
+                        ((!options.terraformOnly && !options.terragruntOnly) ?
+                            ` (${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)` : ''),
+                        `Total files analyzed: ${files.length}` +
+                        ((!options.terraformOnly && !options.terragruntOnly) ?
+                            ` (${terraformFileCount} Terraform, ${terragruntFileCount} Terragrunt)` : ''),
                         '\nModule Summary by Source:'
                     ].filter(Boolean);
 
                     // Sort by frequency
-                    const sortedSources = Object.entries(summary)
+                    const sortedSources = Object.entries(combinedSummary)
                         .sort(([, a], [, b]) => b.count - a.count);
 
                     for (const [source, info] of sortedSources) {
                         // Find the source type by looking at the first module with this source
-                        const sourceType = modules.find(m => m.source === source)?.sourceType || 'unknown';
+                        const sourceType = allModules.find(m => m.source === source)?.sourceType || 'unknown';
                         tableLines.push(`\n${source} (${info.count} instances, type: ${sourceType})`);
 
                         if (Object.keys(info.versions).length > 0) {
@@ -168,7 +238,7 @@ program
 
                     // Additional summary by source type
                     tableLines.push('\nModules by Source Type:');
-                    const typeCount = modules.reduce((acc, module) => {
+                    const typeCount = allModules.reduce((acc: Record<string, number>, module: any) => {
                         acc[module.sourceType] = (acc[module.sourceType] || 0) + 1;
                         return acc;
                     }, {} as Record<string, number>);
@@ -176,8 +246,15 @@ program
                     Object.entries(typeCount)
                         .sort(([, a], [, b]) => b - a)
                         .forEach(([type, count]) => {
-                            tableLines.push(`  ${type}: ${count} modules (${(count / modules.length * 100).toFixed(1)}%)`);
+                            tableLines.push(`  ${type}: ${count} modules (${(count / allModules.length * 100).toFixed(1)}%)`);
                         });
+
+                    // Add summary by file type
+                    if (!options.terraformOnly && !options.terragruntOnly) {
+                        tableLines.push('\nModules by File Type:');
+                        tableLines.push(`  terraform: ${terraformModules.length} modules (${(terraformModules.length / allModules.length * 100).toFixed(1)}%)`);
+                        tableLines.push(`  terragrunt: ${terragruntModules.length} modules (${(terragruntModules.length / allModules.length * 100).toFixed(1)}%)`);
+                    }
 
                     outputData = tableLines.join('\n');
             }
