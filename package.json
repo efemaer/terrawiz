@@ -13,13 +13,16 @@
   },
   "keywords": [
     "terraform",
+    "terragrunt",
     "github",
     "modules",
-    "tracking"
+    "tracking",
+    "iac",
+    "infrastructure-as-code"
   ],
-  "author": "",
+  "author": "Mansour Kheffache",
   "license": "MIT",
-  "description": "A tool to track Terraform modules used in GitHub repositories",
+  "description": "A tool to track and analyze Terraform and Terragrunt modules used in GitHub repositories",
   "dependencies": {
     "@octokit/core": "^6.1.5",
     "@octokit/plugin-throttling": "^10.0.0",

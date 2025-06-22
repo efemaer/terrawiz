@@ -6,6 +6,13 @@ TerraWiz is a command-line tool for tracking and analyzing Terraform and Terragr
 
 TerraWiz scans GitHub repositories to identify Terraform and Terragrunt files and extract information about module usage. It helps teams understand their infrastructure-as-code dependencies, versioning patterns, and module distribution across repositories.
 
+Key features:
+- Scan entire GitHub organizations or specific repositories
+- Support for both Terraform (.tf) and Terragrunt (terragrunt.hcl) files
+- Detection of various module source types including git, registry, local, and artifactory
+- Version tracking and analysis of module dependencies
+- Flexible output formats (JSON, CSV, table)
+
 ## Installation
 
 ### NPM Registry (Soon)
@@ -173,9 +180,27 @@ The tool handles rate limiting for GitHub API results and implements smart throt
 
 - `src/index.ts`: Main entry point and CLI interface
 - `src/services/github.ts`: GitHub API integration for repository access and file content retrieval
+- `src/parsers/base-parser.ts`: Abstract base class for all IaC parsers with shared logic
 - `src/parsers/terraform.ts`: Terraform file parsing logic for module extraction
 - `src/parsers/terragrunt.ts`: Terragrunt file parsing logic for module extraction
 - `src/services/logger.ts`: Logging utilities with component-based logging support
+
+### Architecture
+
+TerraWiz uses an object-oriented approach with inheritance to promote code reuse:
+
+- `BaseParser<T>`: Abstract class that provides common parsing functionality
+  - Defines the `IaCModule` interface for standardized module information
+  - Implements shared methods like `parseModules()`, `determineSourceType()`, `extractVersion()`
+  - Handles common module summary generation
+
+- `TerraformParser`: Extends BaseParser for Terraform-specific parsing
+  - Implements Terraform-specific module extraction logic
+
+- `TerragruntParser`: Extends BaseParser for Terragrunt-specific parsing
+  - Implements Terragrunt-specific module extraction logic
+
+This architecture ensures consistent handling of different IaC file types while allowing for format-specific parsing logic.
 
 ## Notes for Developers
 
@@ -185,11 +210,28 @@ The tool handles rate limiting for GitHub API results and implements smart throt
 - The tool supports various module source formats including GitHub URLs, Terraform Registry, and local paths
 - You will need to set up a GITHUB_TOKEN environment variable in a .env file to authenticate with the GitHub API
 - The tool categorizes module sources into types:
-  - For Terraform: local, artifactory, archive, registry, or unknown
-  - For Terragrunt: local, artifactory, archive, registry, git, or unknown
+  - local: Local module references (e.g., "./modules/vpc")
+  - artifactory: Modules hosted in Artifactory (contains "jfrog.io")
+  - archive: Archive files (ends with .tar.gz or .zip)
+  - registry: Terraform Registry modules (e.g., "terraform-aws-modules/vpc/aws")
+  - git: Git repositories (prefixed with "git::" or containing "github.com"/"gitlab.com")
+  - unknown: Any other source format
 - Terragrunt files are identified by the extension .hcl and either:
   - File named exactly "terragrunt.hcl"
   - Located in a directory with "terragrunt" in the path
+
+## Contributing
+
+Contributions to TerraWiz are welcome! Here's how to get started:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Commit your changes (`git commit -m 'Add some amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
+
+Please ensure your code follows the existing style patterns and includes appropriate documentation.
 
 ## License
 
