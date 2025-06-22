@@ -68,6 +68,8 @@ export interface GitHubServiceOptions {
     useRateLimit?: boolean;
     /** Skip archived repositories */
     skipArchived?: boolean;
+    /** Filter repositories by name using regex pattern */
+    repoPattern?: string;
 }
 
 /**
@@ -79,6 +81,8 @@ export class GitHubService {
     /** Cache for repository status to avoid redundant API calls */
     private repoStatusCache = new Map<string, boolean>();
     private skipArchived: boolean;
+    /** Regex pattern for repository filtering */
+    private repoPattern: RegExp | null = null;
     // Track processed repositories to avoid duplicate logs
     private processedRepoCache = new Set<string>();
 
@@ -96,6 +100,17 @@ export class GitHubService {
 
         this.skipArchived = options.skipArchived !== false; // Default to true
         const useRateLimit = options.useRateLimit !== false; // Default to true
+
+        // Initialize repository pattern filter if provided
+        if (options.repoPattern) {
+            try {
+                this.repoPattern = new RegExp(options.repoPattern);
+                this.logger.info(`Repository filter pattern initialized: ${options.repoPattern}`);
+            } catch (error) {
+                this.logger.errorWithStack(`Invalid repository regex pattern: ${options.repoPattern}`, error as Error);
+                throw new Error(`Invalid repository regex pattern: ${options.repoPattern}`);
+            }
+        }
 
         // Get GitHub token
         const token = process.env.GITHUB_TOKEN;
@@ -136,7 +151,7 @@ export class GitHubService {
             this.logger.debug('GitHub service initialized without rate limit protection');
         }
 
-        this.logger.debug(`Debug mode: ${isDebugMode}, Skip archived: ${this.skipArchived}`);
+        this.logger.debug(`Debug mode: ${isDebugMode}, Skip archived: ${this.skipArchived}, Repo pattern: ${options.repoPattern || 'none'}`);
     }
 
     /**
@@ -195,8 +210,9 @@ export class GitHubService {
             this.logger.info(`Retrieving repositories for ${owner}...`);
 
             const repositories: RepositoryInfo[] = [];
-            // Track skipped archived repositories for reporting
-            let skippedCount = 0;
+            // Track skipped repositories for reporting
+            let skippedArchivedCount = 0;
+            let skippedPatternCount = 0;
 
             // Determine if this is an organization or a user
             let isOrg = true;
@@ -240,7 +256,7 @@ export class GitHubService {
                     }
                 }
 
-                // Filter out archived repositories if requested
+                // Filter repositories based on criteria (archived status and regex pattern)
                 const filteredRepos = response.data.filter((repo: GitHubRepo) => {
                     const fullName = repo.full_name;
 
@@ -252,11 +268,20 @@ export class GitHubService {
                     // Mark as processed
                     this.processedRepoCache.add(fullName);
 
+                    // Skip archived repositories if configured
                     if (this.skipArchived && repo.archived) {
-                        skippedCount++;
+                        skippedArchivedCount++;
                         this.logger.debug(`Skipping archived repository: ${fullName}`);
                         return false;
                     }
+
+                    // Filter by repository name pattern if specified
+                    if (this.repoPattern && !this.repoPattern.test(repo.name)) {
+                        skippedPatternCount++;
+                        this.logger.debug(`Repository ${repo.name} doesn't match pattern ${this.repoPattern}`);
+                        return false;
+                    }
+
                     return true;
                 });
 
@@ -274,7 +299,7 @@ export class GitHubService {
                 const totalProgress = totalReposAvailable > 0 ?
                     `(page ${currentPage}/${Math.ceil(totalReposAvailable / perPage)})` :
                     `(page ${currentPage})`;
-                this.logger.info(`Retrieved ${repoInfos.length} active repositories ${totalProgress}, skipped ${skippedCount} archived repos, total active: ${repositories.length}`);
+                this.logger.info(`Retrieved ${repoInfos.length} active repositories ${totalProgress}, skipped ${skippedArchivedCount} archived repos, filtered out ${skippedPatternCount} by pattern, total active: ${repositories.length}`);
 
                 // Check if we've reached the maximum
                 if (maxRepos !== null && repositories.length >= maxRepos) {
@@ -286,7 +311,7 @@ export class GitHubService {
                 currentPage++;
             }
 
-            this.logger.info(`Found ${repositories.length} active repositories for ${owner} (skipped ${skippedCount} archived)`);
+            this.logger.info(`Found ${repositories.length} active repositories for ${owner} (skipped ${skippedArchivedCount} archived, filtered out ${skippedPatternCount} by pattern)`);
             return repositories;
 
         } catch (error) {
