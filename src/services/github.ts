@@ -5,7 +5,16 @@ import { Logger, LogLevel } from './logger';
 
 dotenv.config();
 
-export interface TerraformFile {
+/**
+ * Type of Infrastructure as Code file
+ */
+export type IacFileType = 'terraform' | 'terragrunt';
+
+/**
+ * Represents an Infrastructure as Code file (Terraform or Terragrunt)
+ */
+export interface IacFile {
+    type: IacFileType;
     repository: string;
     path: string;
     content: string;
@@ -70,10 +79,12 @@ export interface GitHubServiceOptions {
     skipArchived?: boolean;
     /** Filter repositories by name using regex pattern */
     repoPattern?: string;
+    /** Types of IaC files to scan for */
+    iacFileTypes?: IacFileType[];
 }
 
 /**
- * Service for interacting with GitHub API to find and process Terraform files
+ * Service for interacting with GitHub API to find and process Infrastructure as Code files
  */
 export class GitHubService {
     private octokit: Octokit;
@@ -85,6 +96,8 @@ export class GitHubService {
     private repoPattern: RegExp | null = null;
     // Track processed repositories to avoid duplicate logs
     private processedRepoCache = new Set<string>();
+    /** Types of IaC files to scan for */
+    private iacFileTypes: IacFileType[] = ['terraform', 'terragrunt'];
 
     /**
      * Create a new GitHubService instance
@@ -100,6 +113,11 @@ export class GitHubService {
 
         this.skipArchived = options.skipArchived !== false; // Default to true
         const useRateLimit = options.useRateLimit !== false; // Default to true
+
+        // Initialize IaC file types to scan (default: both terraform and terragrunt)
+        if (options.iacFileTypes && options.iacFileTypes.length > 0) {
+            this.iacFileTypes = options.iacFileTypes;
+        }
 
         // Initialize repository pattern filter if provided
         if (options.repoPattern) {
@@ -151,7 +169,7 @@ export class GitHubService {
             this.logger.debug('GitHub service initialized without rate limit protection');
         }
 
-        this.logger.debug(`Debug mode: ${isDebugMode}, Skip archived: ${this.skipArchived}, Repo pattern: ${options.repoPattern || 'none'}`);
+        this.logger.debug(`Debug mode: ${isDebugMode}, Skip archived: ${this.skipArchived}, Repo pattern: ${options.repoPattern || 'none'}, IaC file types: ${this.iacFileTypes.join(', ')}`);
     }
 
     /**
@@ -321,12 +339,12 @@ export class GitHubService {
     }
 
     /**
-     * Get all Terraform files in a repository by traversing its tree
+     * Get all IaC files (Terraform and/or Terragrunt) in a repository by traversing its tree
      * @param repoInfo Repository information
      */
-    async getTerraformFilesFromRepo(repoInfo: RepositoryInfo): Promise<TerraformFile[]> {
+    async getIaCFilesFromRepo(repoInfo: RepositoryInfo): Promise<IacFile[]> {
         try {
-            this.logger.info(`Getting Terraform files from ${repoInfo.fullName}...`);
+            this.logger.info(`Getting IaC files from ${repoInfo.fullName}...`);
 
             // Get reference to the default branch
             const reference = await this.octokit.git.getRef({
@@ -354,30 +372,49 @@ export class GitHubService {
                 recursive: '1' // Recursive flag as string '1'
             });
 
-            // Filter for .tf files
-            const terraformFiles: { path: string; url: string; sha: string }[] = tree.data.tree
-                .filter((item: GitHubTreeItem) =>
-                    item.type === 'blob' && item.path && item.path.endsWith('.tf') && item.sha
-                )
+            // Define predicates for different IaC file types
+            const isTerraformFile = (path?: string) => path?.endsWith('.tf');
+            const isTerragruntFile = (path?: string) =>
+                path?.endsWith('.hcl') &&
+                (path.endsWith('terragrunt.hcl') || path.includes('/terragrunt/'));
+
+            // Filter for specified IaC file types
+            const iacFiles: { path: string; url: string; sha: string; type: IacFileType }[] = tree.data.tree
+                .filter((item: GitHubTreeItem) => {
+                    if (item.type !== 'blob' || !item.path || !item.sha) return false;
+
+                    const isTerraform = this.iacFileTypes.includes('terraform') && isTerraformFile(item.path);
+                    const isTerragrunt = this.iacFileTypes.includes('terragrunt') && isTerragruntFile(item.path);
+
+                    return isTerraform || isTerragrunt;
+                })
                 .map((item: GitHubTreeItem) => ({
                     path: item.path as string,
                     url: `https://github.com/${repoInfo.fullName}/blob/${repoInfo.defaultBranch}/${item.path}`,
-                    sha: item.sha as string
+                    sha: item.sha as string,
+                    type: isTerraformFile(item.path as string) ? 'terraform' : 'terragrunt'
                 }));
 
-            if (terraformFiles.length === 0) {
-                this.logger.info(`No Terraform files found in ${repoInfo.fullName}`);
+            // Count files by type
+            const terraformCount = iacFiles.filter(f => f.type === 'terraform').length;
+            const terragruntCount = iacFiles.filter(f => f.type === 'terragrunt').length;
+
+            if (iacFiles.length === 0) {
+                this.logger.info(`No IaC files found in ${repoInfo.fullName}`);
                 return [];
             }
 
-            this.logger.info(`Found ${terraformFiles.length} Terraform files in ${repoInfo.fullName}`);
+            this.logger.info(
+                `Found ${iacFiles.length} IaC files in ${repoInfo.fullName} ` +
+                `(${terraformCount} Terraform, ${terragruntCount} Terragrunt)`
+            );
 
             // Get content for each file
-            const result: TerraformFile[] = [];
+            const result: IacFile[] = [];
             let processedCount = 0;
-            const totalFiles = terraformFiles.length;
+            const totalFiles = iacFiles.length;
 
-            for (const file of terraformFiles) {
+            for (const file of iacFiles) {
                 try {
                     processedCount++;
                     // Show progress every 10 files or at the end
@@ -387,6 +424,7 @@ export class GitHubService {
 
                     const content = await this.getFileContent(repoInfo.owner, repoInfo.name, file.path);
                     result.push({
+                        type: file.type,
                         repository: repoInfo.fullName,
                         path: file.path,
                         content,
@@ -399,19 +437,52 @@ export class GitHubService {
 
             return result;
         } catch (error) {
-            this.logger.errorWithStack(`Error getting Terraform files from ${repoInfo.fullName}`, error as Error);
+            this.logger.errorWithStack(`Error getting IaC files from ${repoInfo.fullName}`, error as Error);
             return [];
         }
     }
 
     /**
-     * Find all Terraform files using the repository tree approach
+     * Get all Terraform files in a repository by traversing its tree
+     * @param repoInfo Repository information
+     * @deprecated Use getIaCFilesFromRepo instead and filter by type
+     */
+    async getTerraformFilesFromRepo(repoInfo: RepositoryInfo): Promise<IacFile[]> {
+        // Save current IaC file types setting
+        const originalTypes = [...this.iacFileTypes];
+
+        try {
+            // Temporarily set to only look for Terraform files
+            this.iacFileTypes = ['terraform'];
+
+            // Use the new method
+            const allFiles = await this.getIaCFilesFromRepo(repoInfo);
+
+            // Convert to legacy TerraformFile type
+            return allFiles.map(file => ({
+                type: 'terraform' as const,
+                repository: file.repository,
+                path: file.path,
+                content: file.content,
+                url: file.url
+            }));
+        } catch (error) {
+            this.logger.errorWithStack(`Error getting Terraform files from ${repoInfo.fullName}`, error as Error);
+            return [];
+        } finally {
+            // Restore original settings
+            this.iacFileTypes = originalTypes;
+        }
+    }
+
+    /**
+     * Find all Infrastructure as Code files using the repository tree approach
      * @param owner Repository owner or organization name
      * @param repo Repository name (optional, if searching across an organization)
      * @param maxRepos Maximum number of repositories to process
      * @param perPage Number of results per page
      */
-    async findTerraformFiles(owner: string, repo?: string, maxRepos: number | null = null, perPage: number = 100): Promise<TerraformFile[]> {
+    async findIacFiles(owner: string, repo?: string, maxRepos: number | null = null, perPage: number = 100): Promise<IacFile[]> {
         try {
             let repositories: RepositoryInfo[] = [];
 
@@ -449,25 +520,38 @@ export class GitHubService {
 
             this.logger.info(`Processing ${repositories.length} repositories...`);
 
-            // Process each repository to get Terraform files
-            const terraformFiles: TerraformFile[] = [];
+            // Process each repository to get Infrastructure as Code files
+            const iacFiles: IacFile[] = [];
             let processedCount = 0;
 
             for (const repository of repositories) {
                 processedCount++;
                 this.logger.info(`Processing repository ${processedCount}/${repositories.length}: ${repository.fullName}`);
 
-                const files = await this.getTerraformFilesFromRepo(repository);
-                terraformFiles.push(...files);
+                const files = await this.getIaCFilesFromRepo(repository);
+                iacFiles.push(...files);
 
                 // Show a summary of our progress so far
-                this.logger.info(`Progress: ${processedCount}/${repositories.length} repositories processed, ${terraformFiles.length} Terraform files found so far`);
+                const terraformCount = iacFiles.filter(f => f.type === 'terraform').length;
+                const terragruntCount = iacFiles.filter(f => f.type === 'terragrunt').length;
+                this.logger.info(
+                    `Progress: ${processedCount}/${repositories.length} repositories processed, ` +
+                    `${iacFiles.length} IaC files found so far ` +
+                    `(${terraformCount} Terraform, ${terragruntCount} Terragrunt)`
+                );
             }
 
-            this.logger.info(`Found a total of ${terraformFiles.length} Terraform files across ${repositories.length} repositories`);
-            return terraformFiles;
+            // Log summary by file type
+            const terraformCount = iacFiles.filter(f => f.type === 'terraform').length;
+            const terragruntCount = iacFiles.filter(f => f.type === 'terragrunt').length;
+            this.logger.info(
+                `Found a total of ${iacFiles.length} Infrastructure as Code files across ${repositories.length} repositories ` +
+                `(${terraformCount} Terraform, ${terragruntCount} Terragrunt)`
+            );
+
+            return iacFiles;
         } catch (error) {
-            this.logger.errorWithStack('Error searching for Terraform files', error as Error);
+            this.logger.errorWithStack('Error searching for Infrastructure as Code files', error as Error);
             throw error;
         }
     }
