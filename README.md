@@ -233,6 +233,6 @@ Contributions to TerraWiz are welcome! Here's how to get started:
 
 Please ensure your code follows the existing style patterns and includes appropriate documentation.
 
-## License
+## Star History
 
-MIT
+[![Star History Chart](https://api.star-history.com/svg?repos=efemaer/terrawiz&type=Date)](https://www.star-history.com/#efemaer/terrawiz&Date)
