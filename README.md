@@ -232,7 +232,3 @@ Contributions to TerraWiz are welcome! Here's how to get started:
 6. Open a Pull Request
 
 Please ensure your code follows the existing style patterns and includes appropriate documentation.
-
-## Star History
-
-![Star History Chart](https://api.star-history.com/svg?repos=efemaer/terrawiz&type=Date)
