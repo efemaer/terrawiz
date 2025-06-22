@@ -557,42 +557,6 @@ export class GitHubService {
     }
 
     /**
-     * Find all Terraform files using the repository tree approach
-     * @param owner Repository owner or organization name
-     * @param repo Repository name (optional, if searching across an organization)
-     * @param maxRepos Maximum number of repositories to process
-     * @param perPage Number of results per page
-     * @deprecated Use findIacFiles instead and filter by type
-     */
-    async findTerraformFiles(owner: string, repo?: string, maxRepos: number | null = null, perPage: number = 100): Promise<IacFile[]> {
-        // Save current IaC file types setting
-        const originalTypes = [...this.iacFileTypes];
-
-        try {
-            // Temporarily set to only look for Terraform files
-            this.iacFileTypes = ['terraform'];
-
-            // Use the new method
-            const allFiles = await this.findIacFiles(owner, repo, maxRepos, perPage);
-
-            // Convert to legacy TerraformFile type (which should be fine since we only requested terraform files)
-            return allFiles.map(file => ({
-                type: 'terraform' as const,
-                repository: file.repository,
-                path: file.path,
-                content: file.content,
-                url: file.url
-            }));
-        } catch (error) {
-            this.logger.errorWithStack('Error searching for Terraform files', error as Error);
-            throw error;
-        } finally {
-            // Restore original settings
-            this.iacFileTypes = originalTypes;
-        }
-    }
-
-    /**
      * Get content of a file from GitHub
      * @param owner Repository owner
      * @param repo Repository name
