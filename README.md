@@ -1,232 +1,305 @@
-# TerraWiz
+# TerraWiz 🔍
 
-TerraWiz is a command-line tool for tracking and analyzing Terraform and Terragrunt module usage across GitHub repositories and organizations.
+**A blazing-fast CLI tool for discovering and analyzing Terraform & Terragrunt modules across GitHub organizations.**
 
-## Overview
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-TerraWiz scans GitHub repositories to identify Terraform and Terragrunt files and extract information about module usage. It helps teams understand their infrastructure-as-code dependencies, versioning patterns, and module distribution across repositories.
+---
 
-Key features:
-- Scan entire GitHub organizations or specific repositories
-- Support for both Terraform (.tf) and Terragrunt (.hcl) files
-- Detection of various module source types including git, registry, local, and artifactory
-- Version tracking and analysis of module dependencies
-- Flexible output formats (JSON, CSV, table)
+## ✨ Features
 
-## Installation
+- 🚀 **High-Performance Scanning** - Parallel processing with configurable concurrency limits
+- 🔍 **Comprehensive Discovery** - Scan entire GitHub organizations or specific repositories
+- 📊 **Multi-Format Export** - JSON, CSV, and formatted table outputs
+- 🎯 **Smart Filtering** - Repository patterns, file types, and version analysis
+- 🛡️ **Built-in Rate Limiting** - Automatic GitHub API throttling and protection
+- 📈 **Detailed Analytics** - Module usage patterns, source types, and version tracking
+- ⚡ **Intuitive CLI** - Short options, logical grouping, and concise command syntax
 
-### NPM Registry (Soon)
-TBA
 
-### Local Development Build
+## 🗺️ Roadmap
+
+### ✅ Completed
+- **Testing Infrastructure** - Comprehensive test suite with Jest for reliability and confident development
+- **Clean Architecture** - Domain-organized structure with proper separation of concerns
+- **High-Performance Parallel Processing** - Configurable concurrent repository and file processing
+- **Intuitive CLI Interface** - Short options, logical grouping, and user-friendly command syntax
+
+### 🚧 In Progress
+- **Increase Reliability** - Expand test suite to increase coverage and overall reliability
+- **Multi-Platform VCS Support** - GitLab, Bitbucket, and Azure DevOps integration
+
+### 🔮 Planned
+- **Advanced Analytics** - Dependency graphs, security scanning, and compliance reporting
+- **Performance Monitoring** - Built-in metrics and performance optimization suggestions
+
+### 💡 Future Ideas
+- **Web Dashboard** - Browser-based interface for scan results and analytics
+- **CI/CD Integration** - GitHub Actions, GitLab CI, and Jenkins plugins
+- **Plugin System** - Custom parsers and output formatters
+
+## 🚀 Quick Start
+
+### 📋 Requirements
+
+- **Node.js** 22+ 
+- **GitHub Token** with repository read access
+
+### Installation
+
 ```bash
-# Clone the repository
+# Clone and build
 git clone https://github.com/efemaer/terrawiz.git
 cd terrawiz
+npm install && npm run build
 
+# Create global command
+npm link
+```
+
+### Setup GitHub Token
+
+Create a [GitHub Personal Access Token](https://github.com/settings/tokens) with repository read access:
+
+```bash
+# Set environment variable
+export GITHUB_TOKEN=your_token_here
+
+# Or create .env file
+echo "GITHUB_TOKEN=your_token_here" > .env
+```
+
+### Basic Usage
+
+```bash
+# Scan an entire organization
+terrawiz scan -o your-org
+
+# Scan with high performance settings
+terrawiz scan -o your-org -c 10:20
+
+# Export results to CSV
+terrawiz scan -o your-org -f csv -e modules.csv
+```
+
+## 📖 Documentation
+
+### Core Commands
+
+```bash
+terrawiz scan [options]
+```
+
+### Core Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-o, --org <name>` | **Required.** GitHub organization or user | - |
+| `-r, --repo <name>` | Scan specific repository only | All repos |
+| `-p, --pattern <regex>` | Filter repositories by name pattern | - |
+
+### Output Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-f, --format <type>` | Output format: `table`, `json`, `csv` | `table` |
+| `-e, --export <file>` | Export results to file | - |
+
+### Performance Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-c, --concurrency <repos:files>` | Concurrent processing (e.g., `5:10`) | `5:10` |
+| `--limit <number>` | Maximum repositories to scan | Unlimited |
+
+### Filtering Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--include-archived` | Include archived repositories | Skip archived |
+| `--terraform-only` | Scan only Terraform (.tf) files | Both types |
+| `--terragrunt-only` | Scan only Terragrunt (.hcl) files | Both types |
+
+### Advanced Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--disable-rate-limit` | Disable GitHub API rate limiting | Enabled |
+| `--debug` | Enable detailed logging | Disabled |
+
+## 💡 Usage Examples
+
+### Organization Analysis
+
+```bash
+# Complete organization scan
+terrawiz scan -o hashicorp
+
+# High-performance scan for large organizations
+terrawiz scan -o aws -c 15:25 -f json -e aws-modules.json
+```
+
+### Targeted Scanning
+
+```bash
+# Specific repository
+terrawiz scan -o hashicorp -r terraform-aws-vpc
+
+# Pattern-based filtering
+terrawiz scan -o mycompany -p "^terraform-" -f csv
+
+# Infrastructure-specific scans
+terrawiz scan -o myorg --terraform-only -e terraform-only.json
+terrawiz scan -o myorg --terragrunt-only --limit 20
+```
+
+### Development & Debugging
+
+```bash
+# Debug mode with detailed logging
+terrawiz scan -o myorg --debug --limit 3
+
+# Conservative scanning for rate-limited tokens
+terrawiz scan -o myorg -c 2:5
+
+# Include archived repositories
+terrawiz scan -o myorg --include-archived
+```
+
+## 📊 Output Formats
+
+### Table Format (Default)
+```
+Infrastructure as Code Module Usage Report
+============================
+Scope: hashicorp (organization)
+Total modules found: 42 (38 Terraform, 4 Terragrunt)
+Total files analyzed: 156 (134 Terraform, 22 Terragrunt)
+
+Module Summary by Source:
+
+terraform-aws-modules/vpc/aws (12 instances, type: registry)
+  Versions:
+    - ~> 3.0: 8 instances
+    - ~> 2.0: 4 instances
+```
+
+### JSON Format
+```json
+{
+  "metadata": {
+    "owner": "hashicorp",
+    "repository": "All repositories",
+    "timestamp": "2024-06-29T23:15:30.123Z",
+    "moduleCount": 42
+  },
+  "modules": [...],
+  "summary": {...}
+}
+```
+
+### CSV Format
+```csv
+module,source_type,file_type,version,repository,file_path,line_number,github_link
+terraform-aws-modules/vpc/aws,registry,terraform,~> 3.0,terraform-aws-vpc,main.tf,15,https://github.com/...
+```
+
+## 🏗️ Architecture
+
+TerraWiz features a clean, modular architecture:
+
+```
+src/
+├── index.ts              # CLI entry point
+├── vcs/                  # VCS platform integrations
+│   ├── base.ts          # Common VCS patterns
+│   └── github.ts        # GitHub implementation
+├── parsers/             # IaC file parsers
+│   ├── base.ts          # Common parsing logic
+│   ├── terraform.ts     # Terraform parser
+│   └── terragrunt.ts    # Terragrunt parser
+├── utils/               # Utilities
+│   └── concurrent.ts    # Parallel processing
+└── services/            # Shared services
+    └── logger.ts        # Logging service
+```
+
+### Key Design Principles
+
+- **🔄 Parallel Processing** - Concurrent repository and file processing for maximum performance
+- **🎯 Type Safety** - Comprehensive TypeScript types with proper error handling
+- **🔧 Extensible** - Plugin architecture ready for GitLab, Bitbucket, and other VCS platforms
+- **⚡ Performance-First** - Optimized GitHub API usage with intelligent rate limiting
+
+## 🧪 Module Source Detection
+
+TerraWiz automatically categorizes modules by source type:
+
+| Type | Examples | Description |
+|------|----------|-------------|
+| **registry** | `terraform-aws-modules/vpc/aws` | Terraform Registry modules |
+| **git** | `github.com/org/repo.git` | Git repositories |
+| **local** | `./modules/vpc`, `../shared` | Local file paths |
+| **artifactory** | `jfrog.io/modules/vpc` | Artifactory-hosted modules |
+| **archive** | `https://releases.../module.tar.gz` | Archive downloads |
+
+## 🚀 Performance Features
+
+### Parallel Processing
+- **Repository-level parallelism**: Process multiple repositories simultaneously
+- **File-level parallelism**: Download and parse files concurrently within each repository
+- **Configurable limits**: Balance performance with API rate limits
+
+### Optimizations
+- **Smart caching**: Avoid redundant API calls for repository metadata
+- **Batch operations**: Efficient GitHub API usage patterns
+- **Progress tracking**: Real-time feedback for long-running scans
+
+### Rate Limiting
+- **Automatic throttling**: Built-in GitHub API rate limit protection
+- **Retry logic**: Exponential backoff for failed requests
+- **Monitoring**: Rate limit status reporting in debug mode
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how to get started:
+
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+3. **Develop** your changes with tests
+4. **Test** your implementation: `npm test`
+5. **Commit** your changes: `git commit -m 'Add amazing feature'`
+6. **Push** to your branch: `git push origin feature/amazing-feature`
+7. **Open** a Pull Request
+
+### Development Setup
+
+```bash
 # Install dependencies
 npm install
 
-# Build the project
+# Run tests
+npm test
+
+# Type check
+npm run type-check
+
+# Lint and format
+npm run lint
+npm run format
+
+# Build
 npm run build
-
-# Run locally
-node dist/index.js scan --org <organization> [options]
-
-# Optionally, create a symlink to run as a command
-npm link
-terrawiz scan --org <organization> [options]
 ```
 
-## GitHub Token Setup
+## 📄 License
 
-**Important**: TerraWiz requires a GitHub personal access token to access repositories and their contents.
+MIT License - see [LICENSE](LICENSE) file for details.
 
-1. Create a Personal Access Token (PAT) on GitHub:
-   - Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
-   - Create a new token with at least the following permissions:
-     - Repository access: All repositories (or specific repositories you want to scan)
-     - Repository permissions: Contents (Read-only)
+---
 
-2. Set the token as an environment variable:
-   ```bash
-   # For temporary use in current terminal session
-   export GITHUB_TOKEN=your_token_here
-   
-   # Or create a .env file in the project directory
-   echo "GITHUB_TOKEN=your_token_here" > .env
-   ```
-
-3. For persistent use, add the token to your shell profile (.bashrc, .zshrc, etc.)
-
-Without this token, the tool will not be able to authenticate with the GitHub API and will fail to retrieve repository contents.
-
-## Usage
-
-```bash
-terrawiz scan --org <organization> [options]
-```
-
-### Commands
-
-- `scan`: Search for and analyze Terraform modules in GitHub repositories
-
-### Options
-
-#### Scan Command Options
-
-- `--org <organization>`: **Required**. GitHub organization or user name
-- `--repo <repository>`: Specific repository name (if not provided, will search the entire organization)
-- `--repo-pattern <regex>`: Filter repositories by name using regex pattern
-- `--format <format>`: Output format: json, csv, or table (default: table)
-- `--output <filepath>`: Export results to specified file
-- `--debug`: Enable debug logging
-- `--max-repos <number>`: Maximum number of repositories to process
-- `--no-rate-limit`: Disable rate limit protection (enabled by default)
-- `--skip-archived`: Skip archived repositories (default: true)
-- `--terraform-only`: Only scan for Terraform files (default: scan both Terraform and Terragrunt)
-- `--terragrunt-only`: Only scan for Terragrunt files (default: scan both Terraform and Terragrunt)
-
-## Examples
-
-Search an entire organization and display results as a table:
-```bash
-terrawiz scan --org myorg
-```
-
-Scan an entire organization and export results to CSV:
-```bash
-terrawiz scan --org myorg --format csv --output terraform-modules.csv
-```
-
-Search a specific repository and export as JSON:
-```bash
-terrawiz scan --org myorg --repo myrepo --format json --output results.json
-```
-
-Limit search to a specific number of repositories:
-```bash
-terrawiz scan --org myorg --max-repos 5
-```
-
-Filter repositories using regex pattern:
-```bash
-# Match repos that start with "terraform-"
-terrawiz scan --org myorg --repo-pattern "^terraform-"
-
-# Match repos containing "service" anywhere in the name
-terrawiz scan --org myorg --repo-pattern "service" --format json --output service-modules.json
-```
-
-Scan with debug logging enabled (for troubleshooting):
-```bash
-terrawiz scan --org myorg --debug
-```
-
-Search only for Terraform files (excluding Terragrunt):
-```bash
-terrawiz scan --org myorg --terraform-only
-```
-
-Search only for Terragrunt files (excluding Terraform):
-```bash
-terrawiz scan --org myorg --terragrunt-only
-```
-
-## Output
-
-TerraWiz provides a detailed analysis of Terraform module usage:
-
-### JSON Format
-Includes structured data with:
-- Metadata (owner, repository, timestamp, counts by file type)
-- Complete module details (source, version, file location, file type, etc.)
-- Summary statistics
-- Rate limit information
-
-### CSV Format
-Exports a flat file with columns:
-- module
-- source_type
-- file_type (terraform or terragrunt)
-- version
-- repository
-- file_path
-- line_number
-- github_link
-
-### Table Format
-Displays a human-readable summary with:
-- Module count by source
-- Version distribution
-- Source type statistics
-- Rate limit status
-
-## Technical Details
-
-TerraWiz works by:
-1. Retrieving all repositories in an organization or user account
-2. For each repository, getting the file tree from the default branch
-3. Filtering files with .tf (Terraform) and .hcl (Terragrunt) files
-4. Parsing each file to extract module declarations:
-   - For Terraform files: module blocks with source attributes
-   - For Terragrunt files: terraform blocks with source attributes
-5. Categorizing modules by source type (GitHub, Terraform Registry, local, etc.)
-6. Analyzing version constraints and usage patterns
-
-The tool handles rate limiting for GitHub API results and implements smart throttling to maximize throughput while staying within GitHub's limits.
-
-## Project Structure
-
-- `src/index.ts`: Main entry point and CLI interface
-- `src/services/github.ts`: GitHub API integration for repository access and file content retrieval
-- `src/parsers/base-parser.ts`: Abstract base class for all IaC parsers with shared logic
-- `src/parsers/terraform.ts`: Terraform file parsing logic for module extraction
-- `src/parsers/terragrunt.ts`: Terragrunt file parsing logic for module extraction
-- `src/services/logger.ts`: Logging utilities with component-based logging support
-
-### Architecture
-
-TerraWiz uses an object-oriented approach with inheritance to promote code reuse:
-
-- `BaseParser<T>`: Abstract class that provides common parsing functionality
-  - Defines the `IaCModule` interface for standardized module information
-  - Implements shared methods like `parseModules()`, `determineSourceType()`, `extractVersion()`
-  - Handles common module summary generation
-
-- `TerraformParser`: Extends BaseParser for Terraform-specific parsing
-  - Implements Terraform-specific module extraction logic
-
-- `TerragruntParser`: Extends BaseParser for Terragrunt-specific parsing
-  - Implements Terragrunt-specific module extraction logic
-
-This architecture ensures consistent handling of different IaC file types while allowing for format-specific parsing logic.
-
-## Notes for Developers
-
-- TerraWiz uses the GitHub API and includes rate limit protection by default
-- The repository tree approach avoids the GitHub search API's 1000 result limit
-- Source types are determined by analyzing the module source string pattern
-- The tool supports various module source formats including GitHub URLs, Terraform Registry, and local paths
-- You will need to set up a GITHUB_TOKEN environment variable in a .env file to authenticate with the GitHub API
-- The tool categorizes module sources into types:
-  - local: Local module references (e.g., "./modules/vpc")
-  - artifactory: Modules hosted in Artifactory (contains "jfrog.io")
-  - archive: Archive files (ends with .tar.gz or .zip)
-  - registry: Terraform Registry modules (e.g., "terraform-aws-modules/vpc/aws")
-  - git: Git repositories (prefixed with "git::" or containing "github.com"/"gitlab.com")
-  - unknown: Any other source format
-- Terragrunt files are identified by the extension .hcl, which may include some false positives
-
-## Contributing
-
-Contributions to TerraWiz are welcome! Here's how to get started:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Commit your changes (`git commit -m 'Add some amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-Please ensure your code follows the existing style patterns and includes appropriate documentation.
+<p align="center">
+  <strong>Built with ❤️ for Infrastructure as Code teams</strong>
+</p>
