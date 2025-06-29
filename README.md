@@ -28,10 +28,11 @@
 - **Intuitive CLI Interface** - Short options, logical grouping, and user-friendly command syntax
 
 ### 🚧 In Progress
-- **Multi-Platform VCS Support** - GitLab, Bitbucket, and Azure DevOps integration 
+- **Increase Reliability** - Expand test suite to increase coverage and overall reliability
+- **Multi-Platform VCS Support** - GitLab, Bitbucket, and Azure DevOps integration
 
 ### 🔮 Planned
-- **Advanced Analytics** - Dependency graphs, security scanning, and compliance reporting  
+- **Advanced Analytics** - Dependency graphs, security scanning, and compliance reporting
 - **Performance Monitoring** - Built-in metrics and performance optimization suggestions
 
 ### 💡 Future Ideas
