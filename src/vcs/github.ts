@@ -2,10 +2,19 @@ import { Octokit } from '@octokit/rest';
 import { throttling } from '@octokit/plugin-throttling';
 import * as dotenv from 'dotenv';
 import { BaseVcsService, BaseVcsConfig } from './base';
-import { IacFile, IacFileType, VcsRepository, VcsRepositoryFilter, VcsFileDiscoveryOptions, VcsPlatform, VcsError, VcsErrorType } from '../types';
+import {
+  IacFile,
+  IacFileType,
+  VcsRepository,
+  VcsRepositoryFilter,
+  VcsFileDiscoveryOptions,
+  VcsPlatform,
+  VcsError,
+  VcsErrorType,
+} from '../types';
+import { processConcurrentlySettled } from '../utils/concurrent';
 
 dotenv.config();
-
 
 /**
  * GitHub API repository response structure
@@ -18,6 +27,7 @@ interface GitHubRepo {
   };
   default_branch: string;
   archived: boolean;
+  private: boolean;
 }
 
 /**
@@ -44,6 +54,10 @@ export interface GitHubServiceConfig extends BaseVcsConfig {
   repoPattern?: string;
   /** Types of IaC files to scan for (default: ['terraform', 'terragrunt']) */
   iacFileTypes?: readonly IacFileType[];
+  /** Maximum concurrent repositories to process (default: 5) */
+  maxConcurrentRepos?: number;
+  /** Maximum concurrent files to process per repository (default: 10) */
+  maxConcurrentFiles?: number;
 }
 
 /**
@@ -54,6 +68,18 @@ export class GitHubService extends BaseVcsService {
   private useRateLimit: boolean;
   private repoPattern: RegExp | null = null;
   private iacFileTypes: readonly IacFileType[];
+  private maxConcurrentRepos: number;
+  private maxConcurrentFiles: number;
+
+  /**
+   * Get concurrency limits for parallel processing
+   */
+  protected getConcurrencyLimits(): { repos: number; files: number } {
+    return {
+      repos: this.maxConcurrentRepos,
+      files: this.maxConcurrentFiles,
+    };
+  }
 
   /**
    * Create a new GitHubService instance
@@ -69,6 +95,8 @@ export class GitHubService extends BaseVcsService {
 
     this.useRateLimit = config.useRateLimit !== false; // Default to true
     this.iacFileTypes = config.iacFileTypes || ['terraform', 'terragrunt'];
+    this.maxConcurrentRepos = config.maxConcurrentRepos || 5;
+    this.maxConcurrentFiles = config.maxConcurrentFiles || 10;
 
     // Initialize repository pattern filter if provided
     if (config.repoPattern) {
@@ -96,8 +124,8 @@ export class GitHubService extends BaseVcsService {
       );
     }
 
-    this.initializeOctokit(token);
     this.initializeLogger();
+    this.initializeOctokit(token);
     this.logger.info('GitHub service initialized successfully');
   }
 
@@ -146,7 +174,7 @@ export class GitHubService extends BaseVcsService {
    */
   async repositoryExists(owner: string, repo: string): Promise<boolean | null> {
     this.validateOwnerAndRepo(owner, repo);
-    
+
     const cacheKey = this.createCacheKey('repo-exists', owner, repo);
     const cached = this.getCachedRepository(cacheKey);
     if (cached !== undefined) {
@@ -191,6 +219,7 @@ export class GitHubService extends BaseVcsService {
     } catch (error) {
       this.setCachedRepository(cacheKey, null);
       this.handleError(error, 'repositoryExists', { owner, repo });
+      return null;
     }
   }
 
@@ -293,7 +322,7 @@ export class GitHubService extends BaseVcsService {
           fullName: repo.full_name,
           defaultBranch: repo.default_branch,
           archived: repo.archived,
-          private: (repo as any).private || false,
+          private: repo.private || false,
           url: `https://github.com/${repo.full_name}`,
           cloneUrl: `https://github.com/${repo.full_name}.git`,
         }));
@@ -326,6 +355,7 @@ export class GitHubService extends BaseVcsService {
       return filtered;
     } catch (error) {
       this.handleError(error, 'getRepositories', { owner });
+      return [];
     }
   }
 
@@ -334,7 +364,10 @@ export class GitHubService extends BaseVcsService {
    * @param repository Repository information
    * @param options File discovery options
    */
-  async findIacFilesInRepository(repository: VcsRepository, options?: VcsFileDiscoveryOptions): Promise<IacFile[]> {
+  async findIacFilesInRepository(
+    repository: VcsRepository,
+    options?: VcsFileDiscoveryOptions
+  ): Promise<IacFile[]> {
     try {
       this.logger.info(`Getting IaC files from ${repository.fullName}...`);
 
@@ -404,41 +437,64 @@ export class GitHubService extends BaseVcsService {
           `(${terraformCount} Terraform, ${terragruntCount} Terragrunt)`
       );
 
-      // Get content for each file
-      const result: IacFile[] = [];
-      let processedCount = 0;
-      const totalFiles = limitedFiles.length;
+      // Get content for each file in parallel
+      const concurrency = this.getConcurrencyLimits();
+      this.logger.debug(
+        `Processing ${limitedFiles.length} files with concurrency limit: ${concurrency.files}`
+      );
 
-      for (const file of limitedFiles) {
-        try {
-          processedCount++;
-          // Show progress every 10 files or at the end
-          if (processedCount % 10 === 0 || processedCount === totalFiles) {
+      const fileProcessingResult = await processConcurrentlySettled(
+        limitedFiles,
+        async (file, index) => {
+          // Show progress for larger file sets
+          if (limitedFiles.length > 10 && (index + 1) % 10 === 0) {
             this.logger.info(
-              `Processing file ${processedCount}/${totalFiles} in ${repository.fullName}`
+              `Processing file ${index + 1}/${limitedFiles.length} in ${repository.fullName}`
             );
           }
 
           const content = await this.getFileContent(repository.owner, repository.name, file.path);
-          result.push({
+          return {
             type: file.type,
             repository: repository.fullName,
             path: file.path,
             content,
             url: file.url,
             sha: file.sha,
-          });
-        } catch (error) {
+          } as IacFile;
+        },
+        concurrency.files
+      );
+
+      // Collect successful results
+      const result: IacFile[] = [];
+      for (const fileResult of fileProcessingResult.results) {
+        if (fileResult !== null) {
+          result.push(fileResult);
+        }
+      }
+
+      // Log any file processing errors
+      fileProcessingResult.errors.forEach((error, index) => {
+        if (error !== null) {
           this.logger.errorWithStack(
-            `Error getting content for ${file.path} in ${repository.fullName}`,
-            error as Error
+            `Error getting content for ${limitedFiles[index].path} in ${repository.fullName}`,
+            error
           );
         }
+      });
+
+      if (fileProcessingResult.errorCount > 0) {
+        this.logger.info(
+          `File processing completed: ${fileProcessingResult.successCount}/${limitedFiles.length} successful, ` +
+            `${fileProcessingResult.errorCount} failed`
+        );
       }
 
       return result;
     } catch (error) {
       this.handleError(error, 'findIacFilesInRepository', { repository: repository.fullName });
+      return [];
     }
   }
 
@@ -479,6 +535,7 @@ export class GitHubService extends BaseVcsService {
       return await this.findIacFilesInRepository(repository, options);
     } catch (error) {
       this.handleError(error, 'findIacFilesForRepository', { owner, repo });
+      return [];
     }
   }
 
@@ -508,6 +565,7 @@ export class GitHubService extends BaseVcsService {
       }
     } catch (error) {
       this.handleError(error, 'getFileContent', { owner, repo, path });
+      return '';
     }
   }
 }

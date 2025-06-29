@@ -203,10 +203,13 @@ export class VcsError extends Error {
  */
 export interface IVcsService {
   readonly platformName: string;
-  
+
   repositoryExists(owner: string, name: string): Promise<boolean | null>;
   getRepositories(owner: string, filter?: VcsRepositoryFilter): Promise<VcsRepository[]>;
-  findIacFilesInRepository(repository: VcsRepository, options?: VcsFileDiscoveryOptions): Promise<IacFile[]>;
+  findIacFilesInRepository(
+    repository: VcsRepository,
+    options?: VcsFileDiscoveryOptions
+  ): Promise<IacFile[]>;
   findAllIacFiles(
     owner: string,
     repositoryFilter?: VcsRepositoryFilter,

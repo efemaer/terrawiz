@@ -13,6 +13,7 @@ import {
   VcsPlatform,
 } from '../types';
 import { Logger } from '../services/logger';
+import { processConcurrentlySettled } from '../utils/concurrent';
 
 /**
  * Configuration for VCS services
@@ -44,7 +45,7 @@ export abstract class BaseVcsService {
 
   constructor(config: BaseVcsConfig) {
     this.config = config;
-    
+
     // Initialize logger with appropriate level and component
     const logLevel = config.debug ? 3 : 2; // DEBUG : INFO
     Logger.getInstance({ level: logLevel });
@@ -63,10 +64,20 @@ export abstract class BaseVcsService {
    */
   abstract get platformName(): string;
 
+  /**
+   * Get concurrency limits - can be overridden by subclasses
+   */
+  protected getConcurrencyLimits(): { repos: number; files: number } {
+    return { repos: 1, files: 1 }; // Default to sequential processing
+  }
+
   // Abstract methods that must be implemented by concrete classes
   abstract repositoryExists(owner: string, name: string): Promise<boolean | null>;
   abstract getRepositories(owner: string, filter?: VcsRepositoryFilter): Promise<VcsRepository[]>;
-  abstract findIacFilesInRepository(repository: VcsRepository, options?: VcsFileDiscoveryOptions): Promise<IacFile[]>;
+  abstract findIacFilesInRepository(
+    repository: VcsRepository,
+    options?: VcsFileDiscoveryOptions
+  ): Promise<IacFile[]>;
 
   /**
    * Template method for finding all IaC files across repositories
@@ -77,11 +88,11 @@ export abstract class BaseVcsService {
     fileOptions?: VcsFileDiscoveryOptions
   ): Promise<IacFile[]> {
     this.logger.info(`Starting IaC file discovery for ${owner}`);
-    
+
     try {
       // Step 1: Get all repositories
       const repositories = await this.getRepositories(owner, repositoryFilter);
-      
+
       if (repositories.length === 0) {
         this.logger.info(`No repositories found for ${owner}`);
         return [];
@@ -89,38 +100,62 @@ export abstract class BaseVcsService {
 
       this.logger.info(`Found ${repositories.length} repositories to scan`);
 
-      // Step 2: Process each repository
-      const allIacFiles: IacFile[] = [];
-      let processedCount = 0;
+      // Step 2: Process repositories in parallel
+      const concurrency = this.getConcurrencyLimits();
+      this.logger.debug(`Processing repositories with concurrency limit: ${concurrency.repos}`);
 
-      for (const repository of repositories) {
-        processedCount++;
-        this.logger.info(`Processing repository ${processedCount}/${repositories.length}: ${repository.fullName}`);
+      const processingResult = await processConcurrentlySettled(
+        repositories,
+        async (repository, index) => {
+          this.logger.info(
+            `Processing repository ${index + 1}/${repositories.length}: ${repository.fullName}`
+          );
 
-        try {
           const files = await this.findIacFilesInRepository(repository, fileOptions);
-          allIacFiles.push(...files);
 
           const terraformCount = files.filter(f => f.type === 'terraform').length;
           const terragruntCount = files.filter(f => f.type === 'terragrunt').length;
-          
+
           this.logger.info(
             `Repository ${repository.fullName}: ${files.length} IaC files ` +
-            `(${terraformCount} Terraform, ${terragruntCount} Terragrunt)`
+              `(${terraformCount} Terraform, ${terragruntCount} Terragrunt)`
           );
-        } catch (error) {
-          this.logger.errorWithStack(`Failed to process repository ${repository.fullName}`, error as Error);
-          // Continue with other repositories
+
+          return files;
+        },
+        concurrency.repos
+      );
+
+      // Collect all successful results
+      const allIacFiles: IacFile[] = [];
+      for (const result of processingResult.results) {
+        if (result !== null) {
+          allIacFiles.push(...result);
         }
       }
+
+      // Log any errors encountered
+      processingResult.errors.forEach((error, index) => {
+        if (error !== null) {
+          this.logger.errorWithStack(
+            `Failed to process repository ${repositories[index].fullName}`,
+            error
+          );
+        }
+      });
+
+      this.logger.info(
+        `Repository processing completed: ${processingResult.successCount}/${repositories.length} successful, ` +
+          `${processingResult.errorCount} failed`
+      );
 
       // Final summary
       const totalTerraform = allIacFiles.filter(f => f.type === 'terraform').length;
       const totalTerragrunt = allIacFiles.filter(f => f.type === 'terragrunt').length;
-      
+
       this.logger.info(
         `Completed IaC file discovery: ${allIacFiles.length} total files ` +
-        `(${totalTerraform} Terraform, ${totalTerragrunt} Terragrunt) across ${repositories.length} repositories`
+          `(${totalTerraform} Terraform, ${totalTerragrunt} Terragrunt) across ${repositories.length} repositories`
       );
 
       return allIacFiles;
@@ -138,28 +173,31 @@ export abstract class BaseVcsService {
     operationName: string,
     maxRetries: number = this.config.maxRetries || 3
   ): Promise<T> {
-    let lastError: Error;
-    
+    let lastError: Error | undefined;
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         this.logger.debug(`Executing ${operationName} (attempt ${attempt}/${maxRetries})`);
         return await operation();
       } catch (error) {
         lastError = error as Error;
-        
+
         if (attempt === maxRetries) {
           this.logger.error(`Operation ${operationName} failed after ${maxRetries} attempts`);
           break;
         }
-        
+
         // Simple exponential backoff
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        this.logger.warn(`Operation ${operationName} failed, retrying in ${delay}ms`, { attempt, error: lastError.message });
+        this.logger.warn(`Operation ${operationName} failed, retrying in ${delay}ms`, {
+          attempt,
+          error: lastError.message,
+        });
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    
-    throw lastError!;
+
+    throw new Error(lastError?.message || 'Operation failed after retries');
   }
 
   /**
@@ -205,7 +243,10 @@ export abstract class BaseVcsService {
   /**
    * Helper method to filter repositories based on criteria
    */
-  protected filterRepositories(repositories: VcsRepository[], filter?: VcsRepositoryFilter): VcsRepository[] {
+  protected filterRepositories(
+    repositories: VcsRepository[],
+    filter?: VcsRepositoryFilter
+  ): VcsRepository[] {
     if (!filter) {
       return repositories;
     }
@@ -294,9 +335,12 @@ export abstract class BaseVcsService {
   protected handleError(
     error: unknown,
     operation: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): never {
-    this.logger.error(`Error in ${operation}`, { error: error instanceof Error ? error.message : String(error), ...context });
+    this.logger.error(`Error in ${operation}`, {
+      error: error instanceof Error ? error.message : String(error),
+      ...context,
+    });
 
     // If it's already a VcsError, just re-throw it
     if (error instanceof VcsError) {

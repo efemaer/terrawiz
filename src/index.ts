@@ -26,20 +26,32 @@ program
 program
   .command('scan')
   .description('Scan and analyze Infrastructure as Code modules in GitHub repositories')
-  .requiredOption('--org <organization>', 'GitHub organization or user name')
+
+  // === Core Options ===
+  .requiredOption('-o, --org <organization>', 'GitHub organization or user name')
+  .option('-r, --repo <repository>', 'Specific repository name (scans entire org if not specified)')
+  .option('-p, --pattern <regex>', 'Filter repositories by name pattern')
+
+  // === Output Options ===
+  .option('-f, --format <format>', 'Output format: table, json, csv', 'table')
+  .option('-e, --export <file>', 'Export results to file')
+
+  // === Performance Options ===
   .option(
-    '--repo <repository>',
-    'Specific repository name (if not provided, will search the entire organization)'
+    '-c, --concurrency <repos:files>',
+    'Concurrent processing (e.g., "5:10" for 5 repos, 10 files)',
+    '5:10'
   )
-  .option('--repo-pattern <regex>', 'Filter repositories by name using regex pattern')
-  .option('--format <format>', 'Output format: json, csv, or table (default: table)', 'table')
-  .option('--output <filepath>', 'Export results to specified file')
+  .option('--limit <number>', 'Maximum repositories to scan')
+
+  // === Filtering Options ===
+  .option('--include-archived', 'Include archived repositories (default: skip)')
+  .option('--terraform-only', 'Scan only Terraform (.tf) files')
+  .option('--terragrunt-only', 'Scan only Terragrunt (.hcl) files')
+
+  // === Advanced Options ===
+  .option('--disable-rate-limit', 'Disable GitHub API rate limiting')
   .option('--debug', 'Enable debug logging')
-  .option('--max-repos <number>', 'Maximum number of repositories to process')
-  .option('--no-rate-limit', 'Disable rate limit protection')
-  .option('--skip-archived', 'Skip archived repositories (default: true)', true)
-  .option('--terraform-only', 'Only scan for Terraform files')
-  .option('--terragrunt-only', 'Only scan for Terragrunt files')
   .action(async options => {
     try {
       // Configure logging based on debug flag
@@ -48,31 +60,52 @@ program
         logger.debug('Debug logging enabled');
       }
 
-      // Parse API limits options
+      // Parse repository limit
       let maxRepos: number | null = null;
-      if (options.maxRepos) {
-        maxRepos = parseInt(options.maxRepos, 10);
+      if (options.limit) {
+        maxRepos = parseInt(options.limit, 10);
         if (isNaN(maxRepos) || maxRepos < 1) {
-          logger.error('Error: max-repos must be a positive number');
+          logger.error('Error: --limit must be a positive number');
           process.exit(1);
         }
-        logger.info(`Limiting search to ${maxRepos} repositor${maxRepos === 1 ? 'y' : 'ies'}`);
+        logger.info(`Limiting scan to ${maxRepos} repositor${maxRepos === 1 ? 'y' : 'ies'}`);
       }
 
+      // Parse concurrency options
+      let maxConcurrentRepos = 5;
+      let maxConcurrentFiles = 10;
+
+      if (options.concurrency) {
+        const concurrencyMatch = options.concurrency.match(/^(\d+):(\d+)$/);
+        if (concurrencyMatch) {
+          maxConcurrentRepos = parseInt(concurrencyMatch[1], 10);
+          maxConcurrentFiles = parseInt(concurrencyMatch[2], 10);
+        } else {
+          logger.error('Error: --concurrency must be in format "repos:files" (e.g., "5:10")');
+          process.exit(1);
+        }
+      }
+
+      if (maxConcurrentRepos < 1 || maxConcurrentFiles < 1) {
+        logger.error('Error: concurrency values must be positive numbers');
+        process.exit(1);
+      }
+
+      logger.debug(
+        `Concurrency settings: ${maxConcurrentRepos} repos, ${maxConcurrentFiles} files per repo`
+      );
+
       // Validate repository pattern
-      if (options.repoPattern) {
+      if (options.pattern) {
         try {
-          new RegExp(options.repoPattern);
-          logger.info(`Using repository filter pattern: ${options.repoPattern}`);
+          new RegExp(options.pattern);
+          logger.info(`Using repository filter pattern: ${options.pattern}`);
         } catch (error) {
-          logger.error(`Invalid repository pattern regex: ${options.repoPattern}`);
+          logger.error(`Invalid repository pattern regex: ${options.pattern}`);
           logger.errorWithStack('Regex error', error as Error);
           process.exit(1);
         }
       }
-
-      // Fixed perPage to 100 (max allowed by GitHub API)
-      const perPage = 100;
 
       // Validate IaC file types options
       if (options.terraformOnly && options.terragruntOnly) {
@@ -95,10 +128,12 @@ program
         platform: VcsPlatform.GITHUB,
         token: process.env.GITHUB_TOKEN || '',
         debug: options.debug,
-        useRateLimit: options.rateLimit !== false,
-        skipArchived: options.skipArchived,
-        repoPattern: options.repoPattern,
+        useRateLimit: !options.disableRateLimit,
+        skipArchived: !options.includeArchived,
+        repoPattern: options.pattern,
         iacFileTypes,
+        maxConcurrentRepos,
+        maxConcurrentFiles,
       };
 
       // Initialize services
@@ -113,29 +148,27 @@ program
           : 'Terraform and Terragrunt files';
 
       logger.info(
-        `Scanning for ${fileTypesDescription} in ${options.org}${options.repo ? `/${options.repo}` : ''}${options.repoPattern ? ` (filtering by pattern: ${options.repoPattern})` : ''}`
+        `Scanning for ${fileTypesDescription} in ${options.org}${options.repo ? `/${options.repo}` : ''}${options.pattern ? ` (filtering by pattern: ${options.pattern})` : ''}`
       );
 
       // Get IaC files using the new approach
       logger.info(`Getting repositories and extracting ${fileTypesDescription}...`);
-      
+
       let files;
       if (options.repo) {
         // Single repository
         files = await githubService.findIacFilesForRepository(options.org, options.repo, {
           fileTypes: iacFileTypes,
-          maxFiles: options.maxFiles,
         });
       } else {
         // All repositories for organization
         const repositoryFilter = {
-          skipArchived: options.skipArchived,
-          namePattern: options.repoPattern ? new RegExp(options.repoPattern) : undefined,
+          skipArchived: !options.includeArchived,
+          namePattern: options.pattern ? new RegExp(options.pattern) : undefined,
           maxRepositories: maxRepos || undefined,
         };
         const fileOptions = {
           fileTypes: iacFileTypes,
-          maxFiles: options.maxFiles,
         };
         files = await githubService.findAllIacFiles(options.org, repositoryFilter, fileOptions);
       }
@@ -195,7 +228,7 @@ program
         metadata: {
           owner: options.org,
           repository: options.repo || 'All repositories',
-          repoPattern: options.repoPattern || undefined,
+          repoPattern: options.pattern || undefined,
           timestamp: new Date().toISOString(),
           moduleCount: allModules.length,
           fileCount: files.length,
@@ -241,7 +274,7 @@ program
             `\n${fileTypeStr} Module Usage Report`,
             '============================',
             `Scope: ${options.org}${options.repo ? `/${options.repo}` : ' (organization)'}`,
-            options.repoPattern ? `Repository filter: ${options.repoPattern}` : '',
+            options.pattern ? `Repository filter: ${options.pattern}` : '',
             `Total modules found: ${allModules.length}${
               !options.terraformOnly && !options.terragruntOnly
                 ? ` (${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
@@ -312,8 +345,8 @@ program
       }
 
       // Export results if requested or print to console if not exporting
-      if (options.output) {
-        const exportPath = path.resolve(options.output);
+      if (options.export) {
+        const exportPath = path.resolve(options.export);
         fs.writeFileSync(exportPath, outputData);
         logger.info(`Results exported to ${exportPath}`);
       } else {

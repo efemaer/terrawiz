@@ -1,9 +1,9 @@
 {
   "name": "terrawiz",
   "version": "0.0.1",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "bin": {
-    "terrawiz": "dist/index.js"
+    "terrawiz": "dist/src/index.js"
   },
   "scripts": {
     "build": "tsc",
