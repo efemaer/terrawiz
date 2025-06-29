@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 
 import { program } from 'commander';
-import { GitHubService, GitHubServiceOptions } from './services/github';
-import { TerraformParser } from './parsers/terraform';
-import { TerragruntParser } from './parsers/terragrunt';
-import { IaCModule } from './parsers/base-parser';
+import { GitHubService, GitHubServiceConfig } from './vcs';
+import { VcsPlatform } from './types';
+import { TerraformParser, TerragruntParser, IaCModule } from './parsers';
 import { Logger, LogLevel } from './services/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -92,7 +91,9 @@ program
       }
 
       // Configure GitHub service
-      const githubServiceOptions: GitHubServiceOptions = {
+      const githubServiceConfig: GitHubServiceConfig = {
+        platform: VcsPlatform.GITHUB,
+        token: process.env.GITHUB_TOKEN || '',
         debug: options.debug,
         useRateLimit: options.rateLimit !== false,
         skipArchived: options.skipArchived,
@@ -101,7 +102,7 @@ program
       };
 
       // Initialize services
-      const githubService = new GitHubService(githubServiceOptions);
+      const githubService = new GitHubService(githubServiceConfig);
       const terraformParser = new TerraformParser();
 
       // Log what we're scanning for
@@ -115,9 +116,29 @@ program
         `Scanning for ${fileTypesDescription} in ${options.org}${options.repo ? `/${options.repo}` : ''}${options.repoPattern ? ` (filtering by pattern: ${options.repoPattern})` : ''}`
       );
 
-      // Get IaC files using the repository tree approach
+      // Get IaC files using the new approach
       logger.info(`Getting repositories and extracting ${fileTypesDescription}...`);
-      const files = await githubService.findIacFiles(options.org, options.repo, maxRepos, perPage);
+      
+      let files;
+      if (options.repo) {
+        // Single repository
+        files = await githubService.findIacFilesForRepository(options.org, options.repo, {
+          fileTypes: iacFileTypes,
+          maxFiles: options.maxFiles,
+        });
+      } else {
+        // All repositories for organization
+        const repositoryFilter = {
+          skipArchived: options.skipArchived,
+          namePattern: options.repoPattern ? new RegExp(options.repoPattern) : undefined,
+          maxRepositories: maxRepos || undefined,
+        };
+        const fileOptions = {
+          fileTypes: iacFileTypes,
+          maxFiles: options.maxFiles,
+        };
+        files = await githubService.findAllIacFiles(options.org, repositoryFilter, fileOptions);
+      }
 
       if (files.length === 0) {
         logger.info(`No ${fileTypesDescription} found`);

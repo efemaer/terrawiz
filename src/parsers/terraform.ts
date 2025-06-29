@@ -1,5 +1,5 @@
-import { IacFile } from '../types/vcs';
-import { BaseParser, IaCModule } from './base-parser';
+import { IacFile } from '../types';
+import { BaseParser, IaCModule } from './base';
 
 /**
  * Terraform module information

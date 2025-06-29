@@ -196,3 +196,20 @@ export class VcsError extends Error {
     }
   }
 }
+
+/**
+ * Simple VCS service interface for the simplified architecture
+ * (Keeping only the essential interfaces we actually use)
+ */
+export interface IVcsService {
+  readonly platformName: string;
+  
+  repositoryExists(owner: string, name: string): Promise<boolean | null>;
+  getRepositories(owner: string, filter?: VcsRepositoryFilter): Promise<VcsRepository[]>;
+  findIacFilesInRepository(repository: VcsRepository, options?: VcsFileDiscoveryOptions): Promise<IacFile[]>;
+  findAllIacFiles(
+    owner: string,
+    repositoryFilter?: VcsRepositoryFilter,
+    fileOptions?: VcsFileDiscoveryOptions
+  ): Promise<IacFile[]>;
+}

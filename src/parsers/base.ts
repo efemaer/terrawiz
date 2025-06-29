@@ -1,4 +1,4 @@
-import { IacFile } from '../types/vcs';
+import { IacFile } from '../types';
 import { Logger } from '../services/logger';
 
 /**

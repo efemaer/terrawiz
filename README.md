@@ -178,29 +178,44 @@ The tool handles rate limiting for GitHub API results and implements smart throt
 
 ## Project Structure
 
-- `src/index.ts`: Main entry point and CLI interface
-- `src/services/github.ts`: GitHub API integration for repository access and file content retrieval
-- `src/parsers/base-parser.ts`: Abstract base class for all IaC parsers with shared logic
-- `src/parsers/terraform.ts`: Terraform file parsing logic for module extraction
-- `src/parsers/terragrunt.ts`: Terragrunt file parsing logic for module extraction
-- `src/services/logger.ts`: Logging utilities with component-based logging support
+```
+src/
+├── index.ts                    # CLI entry point
+├── types/                      # Shared type definitions
+│   ├── vcs.ts                 # VCS domain types (repositories, files, errors)
+│   └── index.ts               # Type exports
+├── vcs/                       # VCS platform implementations
+│   ├── base.ts                # Base VCS service with common patterns
+│   ├── github.ts              # GitHub API implementation
+│   └── index.ts               # VCS exports
+├── parsers/                   # Infrastructure as Code parsers
+│   ├── base.ts                # Base parser with common functionality
+│   ├── terraform.ts           # Terraform (.tf) file parser
+│   ├── terragrunt.ts          # Terragrunt (.hcl) file parser
+│   └── index.ts               # Parser exports
+└── services/                  # Shared services
+    └── logger.ts              # Logging service
+```
 
 ### Architecture
 
-TerraWiz uses an object-oriented approach with inheritance to promote code reuse:
+TerraWiz uses a clean, domain-organized architecture:
 
-- `BaseParser<T>`: Abstract class that provides common parsing functionality
-  - Defines the `IaCModule` interface for standardized module information
-  - Implements shared methods like `parseModules()`, `determineSourceType()`, `extractVersion()`
-  - Handles common module summary generation
+**VCS Layer (`vcs/`)**
+- `BaseVcsService`: Common patterns for all VCS platforms (caching, error handling, workflows)
+- `GitHubService`: GitHub-specific implementation using Octokit
+- Future: GitLab, Bitbucket services will extend the same base
 
-- `TerraformParser`: Extends BaseParser for Terraform-specific parsing
-  - Implements Terraform-specific module extraction logic
+**Parser Layer (`parsers/`)**
+- `BaseParser`: Common parsing functionality and module extraction patterns
+- `TerraformParser`: Terraform-specific parsing logic for `.tf` files
+- `TerragruntParser`: Terragrunt-specific parsing logic for `.hcl` files
 
-- `TerragruntParser`: Extends BaseParser for Terragrunt-specific parsing
-  - Implements Terragrunt-specific module extraction logic
-
-This architecture ensures consistent handling of different IaC file types while allowing for format-specific parsing logic.
+**Key Design Principles:**
+- **Domain separation**: VCS, parsing, and shared services are clearly separated
+- **Platform flexibility**: Each VCS platform uses its optimal SDK (Octokit for GitHub)
+- **Type safety**: Strong typing with comprehensive error handling via `VcsError`
+- **Clean imports**: Barrel exports enable simple, predictable import paths
 
 ## Notes for Developers
 
@@ -220,11 +235,13 @@ This architecture ensures consistent handling of different IaC file types while 
 
 ## Roadmap
 
-- ✅ **Testing Infrastructure** - Add comprehensive test suite with Jest to ensure reliability and enable confident development
-- 🚧 **Performance Optimization** - Add parallel processing for file operations to dramatically improve scan times for large organizations
-- 🚧 **VCS Platform Support** - Add support for GitLab, Bitbucket, and other version control systems beyond GitHub
-- **Input Validation & Error Handling** - Implement proper validation for GitHub tokens, regex patterns, and meaningful error messages
-- **Enhanced Observability** - Structured logging, progress indicators, and performance metrics for better monitoring
+- ✅ **Testing Infrastructure** - Comprehensive test suite with Jest for reliability and confident development
+- ✅ **Clean Architecture** - Domain-organized structure with proper separation of concerns
+- ✅ **Type Safety** - Strong typing with standardized error handling via `VcsError`
+- 🚧 **VCS Platform Support** - Add support for GitLab, Bitbucket, and other version control systems (architecture ready)
+- **Performance Optimization** - Add parallel processing for file operations to improve scan times for large organizations
+- **Input Validation & Error Handling** - Enhanced validation for GitHub tokens, regex patterns, and meaningful error messages
+- **Enhanced Observability** - Progress indicators and performance metrics for better monitoring
 
 ## Contributing
 
