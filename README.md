@@ -218,6 +218,14 @@ This architecture ensures consistent handling of different IaC file types while 
   - unknown: Any other source format
 - Terragrunt files are identified by the extension .hcl, which may include some false positives
 
+## Roadmap
+
+- [ ] **VCS Platform Support** - Add support for GitLab, Bitbucket, and other version control systems beyond GitHub
+- [ ] **Testing Infrastructure** - Add comprehensive test suite with Jest to ensure reliability and enable confident development
+- [ ] **Input Validation & Error Handling** - Implement proper validation for GitHub tokens, regex patterns, and meaningful error messages
+- [ ] **Performance Optimization** - Add parallel processing for file operations to dramatically improve scan times for large organizations
+- [ ] **Enhanced Observability** - Structured logging, progress indicators, and performance metrics for better monitoring
+
 ## Contributing
 
 Contributions to TerraWiz are welcome! Here's how to get started:
