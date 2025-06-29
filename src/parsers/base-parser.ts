@@ -91,7 +91,7 @@ export abstract class BaseParser<T extends IaCModule> {
     ) {
       return 'archive';
     } else if (
-      source.match(/^[^\/]+\/[^\/]+\/[^\/]+/) ||
+      source.match(/^[^/]+\/[^/]+\/[^/]+/) ||
       source.includes('terraform-aws-modules') ||
       source.includes('.terraform.io')
     ) {

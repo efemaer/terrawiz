@@ -23,7 +23,7 @@ export interface LogContext {
   readonly repository?: string;
   readonly platform?: string;
   readonly duration?: number;
-  readonly [key: string]: any;
+  readonly [key: string]: string | number | boolean | undefined;
 }
 
 /**

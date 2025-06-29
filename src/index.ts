@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { program } from 'commander';
-import { GitHubService, GitHubServiceOptions, IacFile, IacFileType } from './services/github';
-import { TerraformParser, TerraformModule } from './parsers/terraform';
-import { TerragruntParser, TerragruntModule } from './parsers/terragrunt';
+import { GitHubService, GitHubServiceOptions } from './services/github';
+import { TerraformParser } from './parsers/terraform';
+import { TerragruntParser } from './parsers/terragrunt';
 import { IaCModule } from './parsers/base-parser';
 import { Logger, LogLevel } from './services/logger';
 import * as fs from 'fs';
@@ -193,19 +193,23 @@ program
         case 'json':
           outputData = JSON.stringify(result, null, 2);
           break;
-        case 'csv':
-          outputData =
-            'module,source_type,file_type,version,repository,file_path,line_number,github_link\n' +
-            allModules
-              .map(m => {
-                const githubLink = `${m.fileUrl}#L${m.lineNumber}`;
-                const fileType = terraformModules.includes(m as any) ? 'terraform' : 'terragrunt';
-                return `"${m.source}","${m.sourceType}","${fileType}","${m.version || ''}","${m.repository}","${m.filePath}",${m.lineNumber},"${githubLink}"`;
-              })
-              .join('\n');
+        case 'csv': {
+          const csvData = allModules
+            .map(m => {
+              const githubLink = `${m.fileUrl}#L${m.lineNumber}`;
+              const fileType = terraformModules.some(
+                tm => tm.source === m.source && tm.filePath === m.filePath
+              )
+                ? 'terraform'
+                : 'terragrunt';
+              return `"${m.source}","${m.sourceType}","${fileType}","${m.version || ''}","${m.repository}","${m.filePath}",${m.lineNumber},"${githubLink}"`;
+            })
+            .join('\n');
+          outputData = `module,source_type,file_type,version,repository,file_path,line_number,github_link\n${csvData}`;
           break;
+        }
         case 'table':
-        default:
+        default: {
           const fileTypeStr = options.terraformOnly
             ? 'Terraform'
             : options.terragruntOnly
@@ -217,14 +221,16 @@ program
             '============================',
             `Scope: ${options.org}${options.repo ? `/${options.repo}` : ' (organization)'}`,
             options.repoPattern ? `Repository filter: ${options.repoPattern}` : '',
-            `Total modules found: ${allModules.length}` +
-              (!options.terraformOnly && !options.terragruntOnly
+            `Total modules found: ${allModules.length}${
+              !options.terraformOnly && !options.terragruntOnly
                 ? ` (${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
-                : ''),
-            `Total files analyzed: ${files.length}` +
-              (!options.terraformOnly && !options.terragruntOnly
+                : ''
+            }`,
+            `Total files analyzed: ${files.length}${
+              !options.terraformOnly && !options.terragruntOnly
                 ? ` (${terraformFileCount} Terraform, ${terragruntFileCount} Terragrunt)`
-                : ''),
+                : ''
+            }`,
             '\nModule Summary by Source:',
           ].filter(Boolean);
 
@@ -253,7 +259,7 @@ program
           // Additional summary by source type
           tableLines.push('\nModules by Source Type:');
           const typeCount = allModules.reduce(
-            (acc: Record<string, number>, module: any) => {
+            (acc: Record<string, number>, module: IaCModule) => {
               acc[module.sourceType] = (acc[module.sourceType] || 0) + 1;
               return acc;
             },
@@ -280,6 +286,8 @@ program
           }
 
           outputData = tableLines.join('\n');
+          break;
+        }
       }
 
       // Export results if requested or print to console if not exporting

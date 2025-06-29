@@ -1,5 +1,5 @@
 import { IacFile } from '../types/vcs';
-import { BaseParser, IaCModule, SourceType } from './base-parser';
+import { BaseParser, IaCModule } from './base-parser';
 
 /**
  * Terragrunt module information
@@ -67,7 +67,7 @@ export class TerragruntParser extends BaseParser<TerragruntModule> {
         version,
         repository: file.repository,
         filePath: file.path,
-        fileUrl: file.webUrl,
+        fileUrl: file.url,
         lineNumber,
         type: 'terragrunt',
       });
@@ -81,13 +81,13 @@ export class TerragruntParser extends BaseParser<TerragruntModule> {
    */
   private extractModuleName(filePath: string, source: string): string {
     // Try to get the directory name from the file path
-    const dirMatch = filePath.match(/.*\/([^\/]+)\/terragrunt\.hcl$/);
+    const dirMatch = filePath.match(/.*\/([^/]+)\/terragrunt\.hcl$/);
     if (dirMatch && dirMatch[1]) {
       return dirMatch[1];
     }
 
     // Check for simple directory pattern
-    const simpleDirMatch = filePath.match(/([^\/]+)\/terragrunt\.hcl$/);
+    const simpleDirMatch = filePath.match(/([^/]+)\/terragrunt\.hcl$/);
     if (simpleDirMatch && simpleDirMatch[1]) {
       return simpleDirMatch[1];
     }

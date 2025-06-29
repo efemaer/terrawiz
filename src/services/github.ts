@@ -2,24 +2,9 @@ import { Octokit } from '@octokit/rest';
 import { throttling } from '@octokit/plugin-throttling';
 import * as dotenv from 'dotenv';
 import { Logger, LogLevel } from './logger';
+import { IacFile, IacFileType } from '../types/vcs';
 
 dotenv.config();
-
-/**
- * Type of Infrastructure as Code file
- */
-export type IacFileType = 'terraform' | 'terragrunt';
-
-/**
- * Represents an Infrastructure as Code file (Terraform or Terragrunt)
- */
-export interface IacFile {
-  type: IacFileType;
-  repository: string;
-  path: string;
-  content: string;
-  url: string;
-}
 
 /**
  * Repository information structure
@@ -30,16 +15,6 @@ interface RepositoryInfo {
   fullName: string;
   defaultBranch: string;
   archived: boolean;
-}
-
-/**
- * Tree item structure from GitHub API
- */
-interface TreeItem {
-  path: string;
-  type: 'blob' | 'tree';
-  url: string;
-  sha: string;
 }
 
 /**
@@ -80,7 +55,7 @@ export interface GitHubServiceOptions {
   /** Filter repositories by name using regex pattern */
   repoPattern?: string;
   /** Types of IaC files to scan for */
-  iacFileTypes?: IacFileType[];
+  iacFileTypes?: readonly IacFileType[];
 }
 
 /**
@@ -97,7 +72,7 @@ export class GitHubService {
   // Track processed repositories to avoid duplicate logs
   private processedRepoCache = new Set<string>();
   /** Types of IaC files to scan for */
-  private iacFileTypes: IacFileType[] = ['terraform', 'terragrunt'];
+  private iacFileTypes: readonly IacFileType[] = ['terraform', 'terragrunt'];
 
   /**
    * Create a new GitHubService instance
@@ -157,7 +132,7 @@ export class GitHubService {
             this.logger.error(`Rate limit exceeded, no more retries left`);
             return false;
           },
-          onSecondaryRateLimit: (retryAfter, options, octokit) => {
+          onSecondaryRateLimit: (retryAfter, options, _octokit) => {
             this.logger.warn(`Secondary rate limit triggered for ${options.method} ${options.url}`);
             return false; // Don't retry on secondary rate limits by default
           },
@@ -242,7 +217,7 @@ export class GitHubService {
       let isOrg = true;
       try {
         await this.octokit.orgs.get({ org: owner });
-      } catch (error) {
+      } catch {
         isOrg = false;
         this.logger.info(`${owner} is not an organization, treating as a user`);
       }
@@ -395,7 +370,9 @@ export class GitHubService {
       const iacFiles: { path: string; url: string; sha: string; type: IacFileType }[] =
         tree.data.tree
           .filter((item: GitHubTreeItem) => {
-            if (item.type !== 'blob' || !item.path || !item.sha) return false;
+            if (item.type !== 'blob' || !item.path || !item.sha) {
+              return false;
+            }
 
             const isTerraform =
               this.iacFileTypes.includes('terraform') && isTerraformFile(item.path);
@@ -447,6 +424,7 @@ export class GitHubService {
             path: file.path,
             content,
             url: file.url,
+            sha: file.sha,
           });
         } catch (error) {
           this.logger.errorWithStack(
@@ -463,42 +441,6 @@ export class GitHubService {
         error as Error
       );
       return [];
-    }
-  }
-
-  /**
-   * Get all Terraform files in a repository by traversing its tree
-   * @param repoInfo Repository information
-   * @deprecated Use getIaCFilesFromRepo instead and filter by type
-   */
-  async getTerraformFilesFromRepo(repoInfo: RepositoryInfo): Promise<IacFile[]> {
-    // Save current IaC file types setting
-    const originalTypes = [...this.iacFileTypes];
-
-    try {
-      // Temporarily set to only look for Terraform files
-      this.iacFileTypes = ['terraform'];
-
-      // Use the new method
-      const allFiles = await this.getIaCFilesFromRepo(repoInfo);
-
-      // Convert to legacy TerraformFile type
-      return allFiles.map(file => ({
-        type: 'terraform' as const,
-        repository: file.repository,
-        path: file.path,
-        content: file.content,
-        url: file.url,
-      }));
-    } catch (error) {
-      this.logger.errorWithStack(
-        `Error getting Terraform files from ${repoInfo.fullName}`,
-        error as Error
-      );
-      return [];
-    } finally {
-      // Restore original settings
-      this.iacFileTypes = originalTypes;
     }
   }
 

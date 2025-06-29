@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 // Global test utilities
-(global as any).testUtils = {
+(global as typeof global & { testUtils: unknown }).testUtils = {
   /**
    * Create a mock GitHub token for tests
    */

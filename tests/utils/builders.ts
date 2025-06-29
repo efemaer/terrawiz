@@ -10,8 +10,6 @@ import {
   VcsRepository,
   VcsFileTreeItem,
   VcsOperationResult,
-  VcsPagination,
-  VcsRateLimit,
 } from '../../src/types/vcs';
 import {
   MutableIacFile,
@@ -33,14 +31,14 @@ export class VcsRepositoryBuilder {
     defaultBranch: 'main',
     archived: false,
     private: false,
-    webUrl: 'https://github.com/test-owner/test-repo',
+    url: 'https://github.com/test-owner/test-repo',
     cloneUrl: 'https://github.com/test-owner/test-repo.git',
   };
 
   withOwner(owner: string): VcsRepositoryBuilder {
     this.repository.owner = owner;
     this.repository.fullName = `${owner}/${this.repository.name}`;
-    this.repository.webUrl = `https://github.com/${owner}/${this.repository.name}`;
+    this.repository.url = `https://github.com/${owner}/${this.repository.name}`;
     this.repository.cloneUrl = `https://github.com/${owner}/${this.repository.name}.git`;
     return this;
   }
@@ -48,7 +46,7 @@ export class VcsRepositoryBuilder {
   withName(name: string): VcsRepositoryBuilder {
     this.repository.name = name;
     this.repository.fullName = `${this.repository.owner}/${name}`;
-    this.repository.webUrl = `https://github.com/${this.repository.owner}/${name}`;
+    this.repository.url = `https://github.com/${this.repository.owner}/${name}`;
     this.repository.cloneUrl = `https://github.com/${this.repository.owner}/${name}.git`;
     return this;
   }
@@ -58,7 +56,7 @@ export class VcsRepositoryBuilder {
     const [owner, name] = fullName.split('/');
     this.repository.owner = owner;
     this.repository.name = name;
-    this.repository.webUrl = `https://github.com/${fullName}`;
+    this.repository.url = `https://github.com/${fullName}`;
     this.repository.cloneUrl = `https://github.com/${fullName}.git`;
     return this;
   }
@@ -78,8 +76,8 @@ export class VcsRepositoryBuilder {
     return this;
   }
 
-  withWebUrl(webUrl: string): VcsRepositoryBuilder {
-    this.repository.webUrl = webUrl;
+  withUrl(url: string): VcsRepositoryBuilder {
+    this.repository.url = url;
     return this;
   }
 
@@ -106,7 +104,7 @@ export class IacFileBuilder {
     repository: 'test-owner/test-repo',
     path: 'main.tf',
     content: 'resource "aws_instance" "example" {\n  ami = "ami-12345"\n}',
-    webUrl: 'https://github.com/test-owner/test-repo/blob/main/main.tf',
+    url: 'https://github.com/test-owner/test-repo/blob/main/main.tf',
     sha: 'abc123',
     size: 100,
   };
@@ -123,7 +121,7 @@ export class IacFileBuilder {
 
   withRepository(repository: string): IacFileBuilder {
     this.file.repository = repository;
-    this.file.webUrl = `https://github.com/${repository}/blob/main/${this.file.path}`;
+    this.file.url = `https://github.com/${repository}/blob/main/${this.file.path}`;
     return this;
   }
 
@@ -135,7 +133,7 @@ export class IacFileBuilder {
     } else if (path.endsWith('.hcl')) {
       this.file.type = 'terragrunt';
     }
-    this.file.webUrl = `https://github.com/${this.file.repository}/blob/main/${path}`;
+    this.file.url = `https://github.com/${this.file.repository}/blob/main/${path}`;
     return this;
   }
 
@@ -145,8 +143,8 @@ export class IacFileBuilder {
     return this;
   }
 
-  withWebUrl(webUrl: string): IacFileBuilder {
-    this.file.webUrl = webUrl;
+  withUrl(url: string): IacFileBuilder {
+    this.file.url = url;
     return this;
   }
 
@@ -271,12 +269,12 @@ export class VcsFileTreeItemBuilder {
     type: 'file',
     sha: 'abc123',
     size: 100,
-    webUrl: 'https://github.com/test-owner/test-repo/blob/main/main.tf',
+    url: 'https://github.com/test-owner/test-repo/blob/main/main.tf',
   };
 
   withPath(path: string): VcsFileTreeItemBuilder {
     this.item.path = path;
-    this.item.webUrl = `https://github.com/test-owner/test-repo/blob/main/${path}`;
+    this.item.url = `https://github.com/test-owner/test-repo/blob/main/${path}`;
     return this;
   }
 
@@ -295,8 +293,8 @@ export class VcsFileTreeItemBuilder {
     return this;
   }
 
-  withWebUrl(webUrl: string): VcsFileTreeItemBuilder {
-    this.item.webUrl = webUrl;
+  withUrl(url: string): VcsFileTreeItemBuilder {
+    this.item.url = url;
     return this;
   }
 

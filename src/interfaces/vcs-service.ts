@@ -9,6 +9,7 @@ import {
   VcsFileTreeItem,
   VcsOperationResult,
   VcsPagination,
+  VcsRateLimit,
   VcsRepository,
   VcsRepositoryFilter,
 } from '../types/vcs';
@@ -117,7 +118,7 @@ export interface IVcsHealthService {
   /**
    * Get current rate limit status
    */
-  getRateLimit(): Promise<VcsOperationResult<any>>;
+  getRateLimit(): Promise<VcsOperationResult<VcsRateLimit>>;
 
   /**
    * Test authentication

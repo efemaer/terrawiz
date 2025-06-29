@@ -7,7 +7,12 @@ import {
   IacFileType,
   VcsConfig,
   VcsFileDiscoveryOptions,
+  VcsFileTreeItem,
+  VcsOperationResult,
+  VcsPagination,
+  VcsRateLimit,
   VcsRepository,
+  VcsRepositoryFilter,
 } from '../types/vcs';
 import { IVcsService, IVcsCache, IVcsRetryStrategy } from '../interfaces/vcs-service';
 import { ILogger } from '../interfaces/logger';
@@ -96,22 +101,29 @@ export abstract class BaseVcsService implements IVcsService {
   protected abstract testConnection(): Promise<void>;
 
   // Abstract methods that must be implemented by concrete classes
-  abstract getRepository(owner: string, name: string): Promise<any>;
+  abstract getRepository(owner: string, name: string): Promise<VcsOperationResult<VcsRepository>>;
   abstract repositoryExists(owner: string, name: string): Promise<boolean>;
-  abstract getRepositories(owner: string, filter?: any, pagination?: any): Promise<any>;
-  abstract getAllRepositories(owner: string, filter?: any): AsyncIterable<any>;
+  abstract getRepositories(
+    owner: string,
+    filter?: VcsRepositoryFilter,
+    pagination?: VcsPagination
+  ): Promise<VcsOperationResult<VcsRepository[]>>;
+  abstract getAllRepositories(
+    owner: string,
+    filter?: VcsRepositoryFilter
+  ): AsyncIterable<VcsOperationResult<VcsRepository[]>>;
   abstract getFileContent(
     owner: string,
     repository: string,
     path: string,
     branch?: string
-  ): Promise<any>;
+  ): Promise<VcsOperationResult<string>>;
   abstract getFileTree(
     owner: string,
     repository: string,
     branch?: string,
     recursive?: boolean
-  ): Promise<any>;
+  ): Promise<VcsOperationResult<VcsFileTreeItem[]>>;
   abstract fileExists(
     owner: string,
     repository: string,
@@ -121,18 +133,18 @@ export abstract class BaseVcsService implements IVcsService {
   abstract findIacFilesInRepository(
     repository: VcsRepository,
     options?: VcsFileDiscoveryOptions
-  ): Promise<any>;
+  ): Promise<VcsOperationResult<IacFile[]>>;
   abstract findIacFilesInRepositories(
     repositories: VcsRepository[],
     options?: VcsFileDiscoveryOptions
-  ): AsyncIterable<any>;
+  ): AsyncIterable<VcsOperationResult<IacFile[]>>;
   abstract findAllIacFiles(
     owner: string,
-    repositoryFilter?: any,
+    repositoryFilter?: VcsRepositoryFilter,
     fileOptions?: VcsFileDiscoveryOptions
-  ): AsyncIterable<any>;
+  ): AsyncIterable<VcsOperationResult<IacFile[]>>;
   abstract checkHealth(): Promise<boolean>;
-  abstract getRateLimit(): Promise<any>;
+  abstract getRateLimit(): Promise<VcsOperationResult<VcsRateLimit>>;
   abstract testAuthentication(): Promise<boolean>;
 
   /**
@@ -141,7 +153,7 @@ export abstract class BaseVcsService implements IVcsService {
   protected async executeWithRetry<T>(
     operation: () => Promise<T>,
     operationName: string,
-    context?: Record<string, any>
+    context?: Record<string, string | number | boolean>
   ): Promise<T> {
     const operationContext = {
       operation: operationName,
@@ -214,7 +226,10 @@ export abstract class BaseVcsService implements IVcsService {
   /**
    * Helper method to filter IaC files by type and patterns
    */
-  protected filterIacFiles(files: any[], options?: VcsFileDiscoveryOptions): any[] {
+  protected filterIacFiles(
+    files: VcsFileTreeItem[],
+    options?: VcsFileDiscoveryOptions
+  ): VcsFileTreeItem[] {
     if (!options) {
       return files;
     }
@@ -277,17 +292,30 @@ export abstract class BaseVcsService implements IVcsService {
   /**
    * Helper method to handle platform-specific errors
    */
-  protected handleError(error: any, operation: string, context?: Record<string, any>): never {
+  protected handleError(
+    error: unknown,
+    operation: string,
+    context?: Record<string, string | number | boolean>
+  ): never {
     const errorContext = {
       operation,
       platform: this.platformName,
       ...context,
     };
 
-    if (error.response) {
+    // Type guard for HTTP error
+    if (
+      error &&
+      typeof error === 'object' &&
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'status' in error.response
+    ) {
       // HTTP error response
-      const status = error.response.status;
-      const statusText = error.response.statusText;
+      const response = error.response as { status: number; statusText?: string };
+      const status = response.status;
+      const statusText = response.statusText || 'Unknown Error';
 
       this.logger.error(`HTTP error in ${operation}`, {
         ...errorContext,
@@ -308,18 +336,26 @@ export abstract class BaseVcsService implements IVcsService {
         default:
           throw new Error(`HTTP ${status}: ${statusText}`);
       }
-    } else if (error.code) {
+    } else if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      'message' in error &&
+      typeof (error as { message: unknown }).message === 'string'
+    ) {
       // Network or system error
+      const networkError = error as { code: string; message: string };
       this.logger.error(`Network error in ${operation}`, {
         ...errorContext,
-        code: error.code,
+        code: networkError.code,
       });
 
-      throw new Error(`Network error: ${error.message}`);
+      throw new Error(`Network error: ${networkError.message}`);
     } else {
       // Other error
-      this.logger.errorWithStack(`Unexpected error in ${operation}`, error, errorContext);
-      throw error;
+      const errorToLog = error instanceof Error ? error : new Error(String(error));
+      this.logger.errorWithStack(`Unexpected error in ${operation}`, errorToLog, errorContext);
+      throw errorToLog;
     }
   }
 }

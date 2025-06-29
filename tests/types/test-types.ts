@@ -22,7 +22,7 @@ export interface MutableIacFile {
   repository: string;
   path: string;
   content: string;
-  webUrl: string;
+  url: string;
   sha?: string;
   size?: number;
 }
@@ -37,7 +37,7 @@ export interface MutableVcsRepository {
   defaultBranch: string;
   archived: boolean;
   private: boolean;
-  webUrl: string;
+  url: string;
   cloneUrl: string;
 }
 
@@ -71,7 +71,7 @@ export interface MutableVcsFileTreeItem {
   type: 'file' | 'directory';
   sha: string;
   size?: number;
-  webUrl: string;
+  url: string;
 }
 
 /**

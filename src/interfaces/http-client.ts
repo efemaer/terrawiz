@@ -21,7 +21,7 @@ export interface HttpRequestConfig {
   readonly url: string;
   readonly method: HttpMethod;
   readonly headers?: HttpHeaders;
-  readonly body?: any;
+  readonly body?: string | object | FormData | ArrayBuffer;
   readonly timeout?: number;
   readonly retryConfig?: {
     maxRetries: number;
@@ -34,7 +34,7 @@ export interface HttpRequestConfig {
 /**
  * HTTP response with metadata
  */
-export interface HttpResponse<T = any> {
+export interface HttpResponse<T = unknown> {
   readonly data: T;
   readonly status: number;
   readonly statusText: string;
@@ -50,44 +50,44 @@ export interface IHttpClient {
   /**
    * Make a GET request
    */
-  get<T = any>(url: string, config?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>>;
+  get<T = unknown>(url: string, config?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>>;
 
   /**
    * Make a POST request
    */
-  post<T = any>(
+  post<T = unknown>(
     url: string,
-    data?: any,
+    data?: string | object | FormData | ArrayBuffer,
     config?: Partial<HttpRequestConfig>
   ): Promise<HttpResponse<T>>;
 
   /**
    * Make a PUT request
    */
-  put<T = any>(
+  put<T = unknown>(
     url: string,
-    data?: any,
+    data?: string | object | FormData | ArrayBuffer,
     config?: Partial<HttpRequestConfig>
   ): Promise<HttpResponse<T>>;
 
   /**
    * Make a PATCH request
    */
-  patch<T = any>(
+  patch<T = unknown>(
     url: string,
-    data?: any,
+    data?: string | object | FormData | ArrayBuffer,
     config?: Partial<HttpRequestConfig>
   ): Promise<HttpResponse<T>>;
 
   /**
    * Make a DELETE request
    */
-  delete<T = any>(url: string, config?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>>;
+  delete<T = unknown>(url: string, config?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>>;
 
   /**
    * Make a generic request
    */
-  request<T = any>(config: HttpRequestConfig): Promise<HttpResponse<T>>;
+  request<T = unknown>(config: HttpRequestConfig): Promise<HttpResponse<T>>;
 
   /**
    * Set default headers for all requests

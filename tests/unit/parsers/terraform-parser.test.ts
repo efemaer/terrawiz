@@ -4,8 +4,8 @@
 
 import { TerraformParser } from '../../../src/parsers/terraform';
 import { IacFile } from '../../../src/types/vcs';
-import { IacFileBuilder, TestDataFactory } from '../../utils/builders';
-import { terraformSamples, expectedResults } from '../../fixtures/sample-terraform';
+import { IacFileBuilder } from '../../utils/builders';
+import { terraformSamples } from '../../fixtures/sample-terraform';
 
 describe('TerraformParser', () => {
   let parser: TerraformParser;

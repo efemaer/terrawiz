@@ -1,5 +1,3 @@
-import * as util from 'util';
-
 /**
  * Log levels in order of increasing verbosity
  */
@@ -62,10 +60,15 @@ export class Logger {
         ...options,
       });
     } else if (options) {
-      if (options.level !== undefined) Logger.instance.level = options.level;
-      if (options.timestamps !== undefined) Logger.instance.useTimestamps = options.timestamps;
-      if (options.prefixes)
+      if (options.level !== undefined) {
+        Logger.instance.level = options.level;
+      }
+      if (options.timestamps !== undefined) {
+        Logger.instance.useTimestamps = options.timestamps;
+      }
+      if (options.prefixes) {
         Logger.instance.prefixes = { ...Logger.instance.prefixes, ...options.prefixes };
+      }
     }
 
     return Logger.instance;
@@ -99,8 +102,10 @@ export class Logger {
   /**
    * Log a message if the current log level allows it
    */
-  private log(level: LogLevel, message: string, ...args: any[]): void {
-    if (level > this.level) return;
+  private log(level: LogLevel, message: string, ...args: unknown[]): void {
+    if (level > this.level) {
+      return;
+    }
 
     const formatted = this.formatMessage(level, message);
 
@@ -129,7 +134,7 @@ export class Logger {
   /**
    * Log an error message
    */
-  public error(message: string, ...args: any[]): void {
+  public error(message: string, ...args: unknown[]): void {
     this.log(LogLevel.ERROR, message, ...args);
   }
 
@@ -146,21 +151,21 @@ export class Logger {
   /**
    * Log a warning message
    */
-  public warn(message: string, ...args: any[]): void {
+  public warn(message: string, ...args: unknown[]): void {
     this.log(LogLevel.WARN, message, ...args);
   }
 
   /**
    * Log an informational message
    */
-  public info(message: string, ...args: any[]): void {
+  public info(message: string, ...args: unknown[]): void {
     this.log(LogLevel.INFO, message, ...args);
   }
 
   /**
    * Log a debug message
    */
-  public debug(message: string, ...args: any[]): void {
+  public debug(message: string, ...args: unknown[]): void {
     this.log(LogLevel.DEBUG, message, ...args);
   }
 }

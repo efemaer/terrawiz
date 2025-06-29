@@ -29,7 +29,7 @@ export interface VcsRepository {
   readonly defaultBranch: string;
   readonly archived: boolean;
   readonly private: boolean;
-  readonly webUrl: string;
+  readonly url: string;
   readonly cloneUrl: string;
 }
 
@@ -41,7 +41,7 @@ export interface IacFile {
   readonly repository: string;
   readonly path: string;
   readonly content: string;
-  readonly webUrl: string;
+  readonly url: string;
   readonly sha?: string;
   readonly size?: number;
 }
@@ -54,7 +54,7 @@ export interface VcsFileTreeItem {
   readonly type: 'file' | 'directory';
   readonly sha: string;
   readonly size?: number;
-  readonly webUrl: string;
+  readonly url: string;
 }
 
 /**

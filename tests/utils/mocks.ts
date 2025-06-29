@@ -42,17 +42,17 @@ export class MockLogger implements ILogger {
     this.logs.push({ level: 'error', message, context, error });
   }
 
-  child(context: LogContext): ILogger {
+  child(_context: LogContext): ILogger {
     const child = new MockLogger();
     child.logs = this.logs; // Share logs array
     return child;
   }
 
-  isLevelEnabled(level: LogLevel): boolean {
+  isLevelEnabled(_level: LogLevel): boolean {
     return true;
   }
 
-  setLevel(level: LogLevel): void {
+  setLevel(_level: LogLevel): void {
     // Mock implementation
   }
 
@@ -110,42 +110,45 @@ export class MockHttpClient implements IHttpClient {
   }
 
   // HTTP client implementation
-  async get<T = any>(url: string, config?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>> {
+  async get<T = unknown>(
+    url: string,
+    config?: Partial<HttpRequestConfig>
+  ): Promise<HttpResponse<T>> {
     return this.request<T>({ ...config, url, method: 'GET' });
   }
 
-  async post<T = any>(
+  async post<T = unknown>(
     url: string,
-    data?: any,
+    data?: string | object | FormData | ArrayBuffer,
     config?: Partial<HttpRequestConfig>
   ): Promise<HttpResponse<T>> {
     return this.request<T>({ ...config, url, method: 'POST', body: data });
   }
 
-  async put<T = any>(
+  async put<T = unknown>(
     url: string,
-    data?: any,
+    data?: string | object | FormData | ArrayBuffer,
     config?: Partial<HttpRequestConfig>
   ): Promise<HttpResponse<T>> {
     return this.request<T>({ ...config, url, method: 'PUT', body: data });
   }
 
-  async patch<T = any>(
+  async patch<T = unknown>(
     url: string,
-    data?: any,
+    data?: string | object | FormData | ArrayBuffer,
     config?: Partial<HttpRequestConfig>
   ): Promise<HttpResponse<T>> {
     return this.request<T>({ ...config, url, method: 'PATCH', body: data });
   }
 
-  async delete<T = any>(
+  async delete<T = unknown>(
     url: string,
     config?: Partial<HttpRequestConfig>
   ): Promise<HttpResponse<T>> {
     return this.request<T>({ ...config, url, method: 'DELETE' });
   }
 
-  async request<T = any>(config: HttpRequestConfig): Promise<HttpResponse<T>> {
+  async request<T = unknown>(config: HttpRequestConfig): Promise<HttpResponse<T>> {
     this.requests.push(config);
 
     const normalizedUrl = this.normalizeUrl(config.url);
@@ -173,14 +176,14 @@ export class MockHttpClient implements IHttpClient {
   }
 
   addRequestInterceptor(
-    interceptor: (config: HttpRequestConfig) => HttpRequestConfig | Promise<HttpRequestConfig>
+    _interceptor: (config: HttpRequestConfig) => HttpRequestConfig | Promise<HttpRequestConfig>
   ): void {
     // Mock implementation - could store interceptors for testing
   }
 
   addResponseInterceptor(
-    onSuccess: (response: HttpResponse) => HttpResponse | Promise<HttpResponse>,
-    onError?: (error: Error) => Promise<Error>
+    _onSuccess: (response: HttpResponse) => HttpResponse | Promise<HttpResponse>,
+    _onError?: (error: Error) => Promise<Error>
   ): void {
     // Mock implementation - could store interceptors for testing
   }
@@ -196,7 +199,7 @@ export class MockHttpClient implements IHttpClient {
  * Mock cache implementation for testing
  */
 export class MockCache implements IVcsCache {
-  private cache = new Map<string, { value: any; expiry?: number }>();
+  private cache = new Map<string, { value: unknown; expiry?: number }>();
 
   async get<T>(key: string): Promise<T | null> {
     const item = this.cache.get(key);
@@ -298,7 +301,7 @@ export class MockRetryStrategy implements IVcsRetryStrategy {
       }
     }
 
-    throw lastError!;
+    throw new Error(lastError?.message || 'Unknown error occurred');
   }
 
   shouldRetry(error: Error, attemptNumber: number): boolean {

@@ -1,5 +1,5 @@
 import { IacFile } from '../types/vcs';
-import { BaseParser, IaCModule, SourceType } from './base-parser';
+import { BaseParser, IaCModule } from './base-parser';
 
 /**
  * Terraform module information
@@ -63,7 +63,7 @@ export class TerraformParser extends BaseParser<TerraformModule> {
         version,
         repository: file.repository,
         filePath: file.path,
-        fileUrl: file.webUrl,
+        fileUrl: file.url,
         lineNumber,
         type: 'terraform',
       });
