@@ -1,6 +1,6 @@
 # 🧙‍♂️ TerraWiz
 
-**A blazing-fast CLI tool for discovering and analyzing Terraform modules across you organization.**
+**A blazing-fast CLI tool for discovering and analyzing Terraform modules across your organization.**
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -28,6 +28,17 @@ TerraWiz performs source-code scanning across your GitHub organization to find a
 - **GitHub Token** with repository read access
 
 ### Installation
+
+#### Option 1: Install from NPM (Recommended)
+```bash
+# Install globally
+npm install -g terrawiz
+
+# Or run directly with npx
+npx terrawiz scan -o your-org
+```
+
+#### Option 2: Build from Source
 ```bash
 # Clone and build
 git clone https://github.com/efemaer/terrawiz.git

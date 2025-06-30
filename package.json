@@ -32,7 +32,7 @@
   ],
   "author": "Mansour Kheffache",
   "license": "MIT",
-  "description": "A tool to track and analyze Terraform and Terragrunt modules used in GitHub repositories",
+  "description": "A tool to track and analyze Terraform modules used in GitHub repositories",
   "dependencies": {
     "@octokit/core": "^7.0.2",
     "@octokit/plugin-throttling": "^11.0.1",
