@@ -1,4 +1,4 @@
-# TerraWiz 🔍
+# 🧙‍♂️ TerraWiz
 
 **A blazing-fast CLI tool for discovering and analyzing Terraform & Terragrunt modules across GitHub organizations.**
 
