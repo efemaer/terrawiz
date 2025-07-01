@@ -31,6 +31,7 @@
     "infrastructure-as-code"
   ],
   "author": "Mansour Kheffache",
+  "repository": "github:efemaer/terrawiz",
   "license": "MIT",
   "description": "A tool to track and analyze Terraform modules used in GitHub repositories",
   "dependencies": {

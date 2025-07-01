@@ -2,6 +2,7 @@
 
 **A blazing-fast CLI tool for discovering and analyzing Terraform modules across your organization.**
 
+[![npm version](https://img.shields.io/npm/v/terrawiz.svg)](https://www.npmjs.com/package/terrawiz)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
