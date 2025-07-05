@@ -1,32 +1,34 @@
 # 🧙‍♂️ TerraWiz
 
-**A blazing-fast CLI tool for discovering and analyzing Terraform modules across your organization.**
+**A blazing-fast CLI tool for discovering and analyzing Terraform modules across multiple platforms.**
 
 [![npm version](https://img.shields.io/npm/v/terrawiz.svg)](https://www.npmjs.com/package/terrawiz)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-TerraWiz performs source-code scanning across your GitHub organization to find all Terraform and Terragrunt module usage. It identifies module sources (registry, local, git), tracks versions, and generates comprehensive reports in table, JSON, or CSV formats. Perfect for infrastructure audits, dependency tracking, security reviews, and understanding your IaC module ecosystem at scale.
+TerraWiz performs source-code scanning across GitHub organizations, local directories, and other platforms to find all Terraform and Terragrunt module usage. It identifies module sources (registry, local, git), tracks versions, and generates comprehensive reports in table, JSON, or CSV formats. Perfect for infrastructure audits, dependency tracking, security reviews, and understanding your IaC module ecosystem at scale.
 
 ---
 
 ## ✨ Features
 
 - 🚀 **High-Performance Scanning** - Parallel processing with configurable concurrency limits
-- 🔍 **Comprehensive Discovery** - Scan entire GitHub organizations or specific repositories
+- 🌐 **Multi-Platform Support** - GitHub organizations, local directories, and extensible for GitLab/Bitbucket
+- 🔍 **Comprehensive Discovery** - Scan entire organizations, specific repositories, or local file systems
 - 🏗️ **Terraform & Terragrunt Support** - Parse both .tf and .hcl files with source-code analysis
 - 📊 **Multi-Format Export** - JSON, CSV, and formatted table outputs
 - 🎯 **Smart Filtering** - Repository patterns, file types, and version analysis
 - 🛡️ **Built-in Rate Limiting** - Automatic GitHub API throttling and protection
 - 📈 **Detailed Analytics** - Module usage patterns, source types, and version tracking
-- ⚡ **Intuitive CLI** - Short options, logical grouping, and concise command syntax
+- ⚡ **Intuitive CLI** - URI-style source format with backward compatibility
 
 ## 🚀 Quick Start
 
 ### 📋 Requirements
 - **Node.js** 22+
-- **GitHub Token** with repository read access
+- **GitHub Token** with repository read access (for GitHub scanning)
+- **Local filesystem access** (for local directory scanning)
 
 ### Installation
 
@@ -36,7 +38,7 @@ TerraWiz performs source-code scanning across your GitHub organization to find a
 npm install -g terrawiz
 
 # Or run directly with npx
-npx terrawiz scan -o your-org
+npx terrawiz scan github:your-org
 ```
 
 #### Option 2: Build from Source
@@ -47,7 +49,9 @@ cd terrawiz
 npm install && npm run build && npm link
 ```
 
-### Setup GitHub Token
+### Setup
+
+#### For GitHub Scanning
 Create a [GitHub Personal Access Token](https://github.com/settings/tokens) with repository read access:
 ```bash
 # Set environment variable
@@ -57,32 +61,61 @@ export GITHUB_TOKEN=your_token_here
 echo "GITHUB_TOKEN=your_token_here" > .env
 ```
 
+#### For Local Directory Scanning
+No additional setup required - just ensure you have read access to the target directory.
+
 ### Basic Usage
 ```bash
-# Scan an entire organization
-terrawiz scan -o your-org
+# Scan GitHub organization
+terrawiz scan github:your-org
+
+# Scan local directory
+terrawiz scan local:/path/to/terraform/code
+
+# Scan specific GitHub repository
+terrawiz scan github:your-org/specific-repo
 
 # Export to CSV with performance tuning
-terrawiz scan -o your-org -f csv -e modules.csv -c 10:20
+terrawiz scan github:your-org -f csv -e modules.csv -c 10:20
 
-# Scan specific repository
-terrawiz scan -o your-org -r specific-repo
+# Scan relative local path
+terrawiz scan local:./infrastructure
 ```
 
 ## 📖 CLI Reference
 
 ### Core Command
 ```bash
-terrawiz scan [options]
+terrawiz scan <source> [options]
 ```
 
+### Sources
+
+TerraWiz uses a URI-style format to specify what to scan:
+
+| Format | Description | Examples |
+|--------|-------------|----------|
+| `github:org` | Scan GitHub organization | `github:hashicorp` |
+| `github:org/repo` | Scan specific GitHub repository | `github:hashicorp/terraform` |
+| `local:/path` | Scan local directory (absolute path) | `local:/home/user/terraform` |
+| `local:./path` | Scan local directory (relative path) | `local:./infrastructure` |
+
+**Platform Aliases:**
+- `gh:` = `github:`
+- `file:` = `local:`
+- `fs:` = `local:`
+
 ### Options
+
+#### Legacy Options (Deprecated)
+| Option | Description | Migration |
+|--------|-------------|-----------|
+| `-o, --org <name>` | **[DEPRECATED]** GitHub organization | Use `github:org` |
+| `-r, --repo <name>` | **[DEPRECATED]** Specific repository | Use `github:org/repo` |
 
 #### Core Options
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-o, --org <name>` | **Required.** GitHub organization or user | - |
-| `-r, --repo <name>` | Scan specific repository only | All repos |
 | `-p, --pattern <regex>` | Filter repositories by name pattern | - |
 
 #### Output Options
@@ -100,54 +133,90 @@ terrawiz scan [options]
 #### Filtering Options
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--include-archived` | Include archived repositories | Skip archived |
+| `--include-archived` | Include archived repositories (GitHub only) | Skip archived |
 | `--terraform-only` | Scan only Terraform (.tf) files | Both types |
 | `--terragrunt-only` | Scan only Terragrunt (.hcl) files | Both types |
 
 #### Advanced Options
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--disable-rate-limit` | Disable GitHub API rate limiting | Enabled |
+| `--disable-rate-limit` | Disable GitHub API rate limiting (GitHub only) | Enabled |
 | `--debug` | Enable detailed logging | Disabled |
 
 ## 💡 Usage Examples
 
-### Organization Analysis
+### GitHub Organization Analysis
 
 ```bash
 # Complete organization scan
-terrawiz scan -o hashicorp
+terrawiz scan github:hashicorp
 
 # High-performance scan for large organizations
-terrawiz scan -o aws -c 15:25 -f json -e aws-modules.json
+terrawiz scan github:aws -c 15:25 -f json -e aws-modules.json
+
+# Legacy format (deprecated but still works)
+terrawiz scan -o hashicorp
 ```
 
 ### Targeted Scanning
 
 ```bash
-# Specific repository
-terrawiz scan -o hashicorp -r terraform-aws-vpc
+# Specific GitHub repository
+terrawiz scan github:hashicorp/terraform-aws-vpc
 
 # Pattern-based filtering
-terrawiz scan -o mycompany -p "^terraform-" -f csv
+terrawiz scan github:mycompany -p "^terraform-" -f csv
+
+# Local directory scanning
+terrawiz scan local:/home/user/terraform-projects
+terrawiz scan local:./infrastructure
 
 # Infrastructure-specific scans
-terrawiz scan -o myorg --terraform-only -e terraform-only.json
-terrawiz scan -o myorg --terragrunt-only --limit 20
+terrawiz scan github:myorg --terraform-only -e terraform-only.json
+terrawiz scan local:./terraform --terragrunt-only
 ```
 
 ### Development & Debugging
 
 ```bash
 # Debug mode with detailed logging
-terrawiz scan -o myorg --debug --limit 3
+terrawiz scan github:myorg --debug --limit 3
 
 # Conservative scanning for rate-limited tokens
-terrawiz scan -o myorg -c 2:5
+terrawiz scan github:myorg -c 2:5
 
-# Include archived repositories
-terrawiz scan -o myorg --include-archived
+# Include archived repositories (GitHub only)
+terrawiz scan github:myorg --include-archived
+
+# Local development workflow
+terrawiz scan local:. --debug
 ```
+
+### Local Filesystem Features
+
+```bash
+# Scan current directory
+terrawiz scan local:.
+
+# Scan with absolute path  
+terrawiz scan local:/home/user/infrastructure
+
+# Export local scan results
+terrawiz scan local:./terraform -f json -e local-modules.json
+
+# Filter file types locally
+terrawiz scan local:/projects/terraform --terraform-only
+
+# High concurrency for large local directories
+terrawiz scan local:/enterprise/iac -c 1:20
+```
+
+**Local Filesystem Benefits:**
+- ⚡ **No API Rate Limits** - Scan as fast as your filesystem allows
+- 🔒 **Complete Privacy** - No external API calls or data transmission
+- 📁 **Recursive Scanning** - Automatically traverses subdirectories
+- 🚫 **Smart Filtering** - Skips common directories (.git, node_modules, etc.)
+- 🔧 **Development Friendly** - Perfect for CI/CD pipelines and local development
 
 ## 📊 Sample Outputs
 
@@ -155,7 +224,8 @@ terrawiz scan -o myorg --include-archived
 ```
 Infrastructure as Code Module Usage Report
 ============================
-Scope: mycompany (organization)
+Platform: GitHub
+Scope: mycompany
 Total modules found: 14 (11 Terraform, 3 Terragrunt)
 Total files analyzed: 38 (31 Terraform, 7 Terragrunt)
 Repositories scanned: 8
@@ -197,6 +267,8 @@ Modules by File Type:
 ```json
 {
   "metadata": {
+    "platform": "GitHub",
+    "source": "github:mycompany", 
     "owner": "mycompany",
     "repository": "All repositories",
     "timestamp": "2024-06-29T14:23:15.456Z",
@@ -270,14 +342,16 @@ Modules by File Type:
 ## 🗺️ Roadmap
 
 ### ✅ Completed
-- **Testing Infrastructure** - Comprehensive test suite with Jest
+- **Local Filesystem Support** - Scan local directories with full feature parity
+- **Modern CLI Interface** - URI-style source format with backward compatibility
+- **Testing Infrastructure** - Comprehensive test suite with Jest (68% coverage)
 - **Clean Architecture** - Domain-organized structure with proper separation
 - **High-Performance Parallel Processing** - Configurable concurrent processing
-- **Intuitive CLI Interface** - Short options and user-friendly syntax
+- **Service Factory Pattern** - Extensible architecture for multiple platforms
 
 ### 🚧 In Progress
-- **Increase Reliability** - Expand test coverage and overall reliability
-- **Multi-Platform VCS Support** - GitLab, Bitbucket, and Azure DevOps integration
+- **Extended VCS Support** - GitLab, Bitbucket, and Azure DevOps integration
+- **Enhanced Testing** - Increase coverage to 80%+
 
 ### 🔮 Planned
 - **Advanced Analytics** - Dependency graphs, security scanning, compliance reporting
@@ -294,13 +368,16 @@ src/
 ├── index.ts              # CLI entry point
 ├── vcs/                  # VCS platform integrations
 │   ├── base.ts          # Common VCS patterns
-│   └── github.ts        # GitHub implementation
+│   ├── factory.ts       # Service factory
+│   ├── github.ts        # GitHub implementation
+│   └── local.ts         # Local filesystem implementation
 ├── parsers/             # IaC file parsers
 │   ├── base.ts          # Common parsing logic
 │   ├── terraform.ts     # Terraform parser
 │   └── terragrunt.ts    # Terragrunt parser
 ├── utils/               # Utilities
-│   └── concurrent.ts    # Parallel processing
+│   ├── concurrent.ts    # Parallel processing
+│   └── source-parser.ts # Source URI parsing
 └── services/            # Shared services
     └── logger.ts        # Logging service
 ```
