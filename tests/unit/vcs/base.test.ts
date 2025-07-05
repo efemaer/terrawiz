@@ -57,6 +57,14 @@ class TestVcsService extends BaseVcsService {
     return this.filterRepositories(filtered, filter);
   }
 
+  async getSingleRepository(owner: string, repo: string): Promise<VcsRepository | null> {
+    if (this.shouldThrowError && this.errorToThrow) {
+      throw this.errorToThrow;
+    }
+
+    return this.mockRepositories.find(r => r.owner === owner && r.name === repo) || null;
+  }
+
   async findIacFilesInRepository(
     repository: VcsRepository,
     _options?: VcsFileDiscoveryOptions

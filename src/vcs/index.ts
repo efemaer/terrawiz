@@ -8,8 +8,5 @@ export * from './base';
 // GitHub implementation
 export * from './github';
 
-// Local filesystem implementation
-export * from './local';
-
 // Service factory
 export * from './factory';

@@ -68,6 +68,10 @@ export default [
         testUtils: 'readonly',
       },
     },
+    rules: {
+      // Allow any in test files for mocking and type assertions
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
   },
   {
     ignores: [
@@ -75,7 +79,7 @@ export default [
       'node_modules/',
       'coverage/',
       '*.js',
-      '!eslint.config.js',
+      '!eslint.config.mjs',
       '!jest.config.js',
     ],
   },

@@ -1,6 +1,5 @@
 import { VcsPlatform } from '../types';
 import { GitHubService, GitHubServiceConfig } from './github';
-import { LocalFilesystemService, LocalFilesystemServiceConfig } from './local';
 import { BaseVcsService } from './base';
 
 /**
@@ -35,7 +34,10 @@ export class VcsServiceFactory {
         return VcsServiceFactory.createGitHubService(config);
 
       case VcsPlatform.LOCAL:
-        return VcsServiceFactory.createLocalFilesystemService(config);
+        throw new Error(
+          `Local filesystem scanning is now handled by LocalFilesystemScanner. ` +
+            `VCS factory should not be used for local filesystem.`
+        );
 
       case VcsPlatform.GITLAB:
       case VcsPlatform.GITLAB_SELF_HOSTED:
@@ -44,7 +46,7 @@ export class VcsServiceFactory {
       case VcsPlatform.GITHUB_ENTERPRISE:
         throw new Error(
           `Platform ${config.platform} is not yet supported. ` +
-            `Currently supported platforms: github, local`
+            `Currently supported platforms: github`
         );
 
       default:
@@ -74,32 +76,14 @@ export class VcsServiceFactory {
   }
 
   /**
-   * Create local filesystem service instance
-   */
-  private static createLocalFilesystemService(
-    config: VcsServiceFactoryConfig
-  ): LocalFilesystemService {
-    const localConfig: LocalFilesystemServiceConfig = {
-      platform: VcsPlatform.LOCAL,
-      debug: config.debug,
-      skipArchived: false, // Not applicable for local filesystem
-      maxRetries: config.maxRetries || 1,
-      cacheEnabled: config.cacheEnabled,
-      maxConcurrentFiles: config.maxConcurrentFiles,
-    };
-
-    return new LocalFilesystemService(localConfig);
-  }
-
-  /**
-   * Get list of supported platforms
+   * Get list of supported VCS platforms (local filesystem is handled separately)
    */
   static getSupportedPlatforms(): VcsPlatform[] {
-    return [VcsPlatform.GITHUB, VcsPlatform.LOCAL];
+    return [VcsPlatform.GITHUB];
   }
 
   /**
-   * Check if a platform is supported
+   * Check if a platform is supported by VCS factory
    */
   static isPlatformSupported(platform: VcsPlatform): boolean {
     return VcsServiceFactory.getSupportedPlatforms().includes(platform);

@@ -2,8 +2,10 @@
 
 import { program } from 'commander';
 import { VcsServiceFactory, VcsServiceFactoryConfig } from './vcs';
+import { LocalFilesystemScanner } from './scanners';
 import { TerraformParser, TerragruntParser, IaCModule } from './parsers';
 import { Logger, LogLevel } from './services/logger';
+import { VcsPlatform } from './types';
 import {
   parseSource,
   convertLegacyToSource,
@@ -13,11 +15,9 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { DEFAULT_REPO_CONCURRENCY, DEFAULT_FILE_CONCURRENCY } from './constants';
 
-// Load environment variables from .env
 dotenv.config();
-
-// Initialize the logger
 const logger = Logger.forComponent('Main');
 
 /**
@@ -47,24 +47,17 @@ program
   )
   .option('-p, --pattern <regex>', 'Filter repositories by name pattern')
 
-  // === Output Options ===
   .option('-f, --format <format>', 'Output format: table, json, csv', 'table')
   .option('-e, --export <file>', 'Export results to file')
-
-  // === Performance Options ===
   .option(
     '-c, --concurrency <repos:files>',
     'Concurrent processing (e.g., "5:10" for 5 repos, 10 files)',
     '5:10'
   )
   .option('--limit <number>', 'Maximum repositories to scan')
-
-  // === Filtering Options ===
   .option('--include-archived', 'Include archived repositories (default: skip)')
   .option('--terraform-only', 'Scan only Terraform (.tf) files')
   .option('--terragrunt-only', 'Scan only Terragrunt (.hcl) files')
-
-  // === Advanced Options ===
   .option('--disable-rate-limit', 'Disable GitHub API rate limiting')
   .option('--debug', 'Enable debug logging')
   .action(async (source, options) => {
@@ -128,8 +121,8 @@ program
       }
 
       // Parse concurrency options
-      let maxConcurrentRepos = 5;
-      let maxConcurrentFiles = 10;
+      let maxConcurrentRepos = DEFAULT_REPO_CONCURRENCY;
+      let maxConcurrentFiles = DEFAULT_FILE_CONCURRENCY;
 
       if (options.concurrency) {
         const concurrencyMatch = options.concurrency.match(/^(\d+):(\d+)$/);
@@ -179,24 +172,6 @@ program
         iacFileTypes = ['terragrunt'];
       }
 
-      // Create VCS service using factory
-      const vcsServiceConfig: VcsServiceFactoryConfig = {
-        platform: parsedSource.platform,
-        debug: options.debug,
-        skipArchived: !options.includeArchived,
-        cacheEnabled: true,
-        githubToken: process.env.GITHUB_TOKEN,
-        useRateLimit: !options.disableRateLimit,
-        repoPattern: options.pattern,
-        iacFileTypes,
-        maxConcurrentRepos,
-        maxConcurrentFiles,
-      };
-
-      // Initialize services
-      const vcsService = VcsServiceFactory.createService(vcsServiceConfig);
-      const terraformParser = new TerraformParser();
-
       // Log what we're scanning for
       const fileTypesDescription = options.terraformOnly
         ? 'Terraform files'
@@ -212,40 +187,73 @@ program
         `Scanning for ${fileTypesDescription} in ${getPlatformDisplayName(parsedSource.platform)}: ${targetDescription}${options.pattern ? ` (filtering by pattern: ${options.pattern})` : ''}`
       );
 
-      // Get IaC files using the new approach
-      logger.info(`Getting repositories and extracting ${fileTypesDescription}...`);
-
+      // Route to platform-specific scanning logic
       let files;
-      if (parsedSource.repository) {
-        // Single repository specified in source
-        const repositories = await vcsService.getRepositories(parsedSource.identifier);
-        const targetRepo = repositories.find(repo => repo.name === parsedSource.repository);
+      if (parsedSource.platform === VcsPlatform.LOCAL) {
+        // Local filesystem - direct scanning, no VCS concepts
+        logger.info(`Scanning local filesystem...`);
 
-        if (!targetRepo) {
-          logger.error(
-            `Repository '${parsedSource.repository}' not found in '${parsedSource.identifier}'`
-          );
-          process.exit(1);
-        }
+        const localScanner = new LocalFilesystemScanner({
+          maxConcurrentFiles,
+          debug: options.debug,
+        });
 
-        files = await vcsService.findIacFilesInRepository(targetRepo, {
+        files = await localScanner.scanDirectory(parsedSource.identifier, {
           fileTypes: iacFileTypes,
         });
       } else {
-        // All repositories for organization/directory
-        const repositoryFilter = {
+        // VCS platforms - use repository discovery and scanning
+        logger.info(`Getting repositories and extracting ${fileTypesDescription}...`);
+
+        // Create VCS service using factory
+        const vcsServiceConfig: VcsServiceFactoryConfig = {
+          platform: parsedSource.platform,
+          debug: options.debug,
           skipArchived: !options.includeArchived,
-          namePattern: options.pattern ? new RegExp(options.pattern) : undefined,
-          maxRepositories: maxRepos || undefined,
+          cacheEnabled: true,
+          githubToken: process.env.GITHUB_TOKEN,
+          useRateLimit: !options.disableRateLimit,
+          repoPattern: options.pattern,
+          iacFileTypes,
+          maxConcurrentRepos,
+          maxConcurrentFiles,
         };
-        const fileOptions = {
-          fileTypes: iacFileTypes,
-        };
-        files = await vcsService.findAllIacFiles(
-          parsedSource.identifier,
-          repositoryFilter,
-          fileOptions
-        );
+
+        const vcsService = VcsServiceFactory.createService(vcsServiceConfig);
+
+        if (parsedSource.repository) {
+          // Single repository specified in source - fetch it directly
+          const targetRepo = await vcsService.getSingleRepository(
+            parsedSource.identifier,
+            parsedSource.repository
+          );
+
+          if (!targetRepo) {
+            logger.error(
+              `Repository '${parsedSource.repository}' not found in '${parsedSource.identifier}'`
+            );
+            process.exit(1);
+          }
+
+          files = await vcsService.findIacFilesInRepository(targetRepo, {
+            fileTypes: iacFileTypes,
+          });
+        } else {
+          // All repositories for organization
+          const repositoryFilter = {
+            skipArchived: !options.includeArchived,
+            namePattern: options.pattern ? new RegExp(options.pattern) : undefined,
+            maxRepositories: maxRepos || undefined,
+          };
+          const fileOptions = {
+            fileTypes: iacFileTypes,
+          };
+          files = await vcsService.findAllIacFiles(
+            parsedSource.identifier,
+            repositoryFilter,
+            fileOptions
+          );
+        }
       }
 
       if (files.length === 0) {
@@ -261,7 +269,8 @@ program
           `${terragruntFileCount} Terragrunt. Analyzing module usage...`
       );
 
-      // Initialize parsers for each type if needed
+      // Initialize parsers for module analysis
+      const terraformParser = new TerraformParser();
       const terragruntParser = new TerragruntParser();
 
       // Extract module information based on file type
@@ -303,8 +312,13 @@ program
         metadata: {
           platform: getPlatformDisplayName(parsedSource.platform),
           source: parsedSource.originalInput,
-          owner: parsedSource.identifier,
-          repository: parsedSource.repository || 'All repositories',
+          target: targetDescription,
+          scope:
+            parsedSource.platform === VcsPlatform.LOCAL
+              ? `Local directory: ${path.basename(parsedSource.identifier)}`
+              : parsedSource.repository
+                ? `Single repository: ${parsedSource.repository}`
+                : `All repositories in ${parsedSource.identifier}`,
           repoPattern: options.pattern || undefined,
           timestamp: new Date().toISOString(),
           moduleCount: allModules.length,
@@ -350,8 +364,9 @@ program
           const tableLines = [
             `\n${fileTypeStr} Module Usage Report`,
             '============================',
-            `Platform: ${getPlatformDisplayName(parsedSource.platform)}`,
-            `Scope: ${targetDescription}`,
+            `Platform: ${result.metadata.platform}`,
+            `Target: ${result.metadata.target}`,
+            `Scope: ${result.metadata.scope}`,
             options.pattern ? `Repository filter: ${options.pattern}` : '',
             `Total modules found: ${allModules.length}${
               !options.terraformOnly && !options.terragruntOnly

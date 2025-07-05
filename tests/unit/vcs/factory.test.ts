@@ -1,6 +1,5 @@
 import { VcsServiceFactory } from '../../../src/vcs/factory';
 import { VcsPlatform } from '../../../src/types';
-import { LocalFilesystemService } from '../../../src/vcs/local';
 
 // Mock the GitHub service to avoid ES module import issues in tests
 jest.mock('../../../src/vcs/github', () => ({
@@ -23,14 +22,15 @@ describe('VcsServiceFactory', () => {
       expect(service.platformName).toBe('GitHub');
     });
 
-    it('should create Local Filesystem service', () => {
+    it('should throw error for local filesystem platform (handled separately)', () => {
       const config = {
         platform: VcsPlatform.LOCAL,
         debug: false,
       };
 
-      const service = VcsServiceFactory.createService(config);
-      expect(service).toBeInstanceOf(LocalFilesystemService);
+      expect(() => VcsServiceFactory.createService(config)).toThrow(
+        'Local filesystem scanning is now handled by LocalFilesystemScanner'
+      );
     });
 
     it('should throw error for unsupported GitLab platform', () => {
@@ -40,7 +40,7 @@ describe('VcsServiceFactory', () => {
       };
 
       expect(() => VcsServiceFactory.createService(config)).toThrow(
-        'Platform gitlab is not yet supported. Currently supported platforms: github, local'
+        'Platform gitlab is not yet supported. Currently supported platforms: github'
       );
     });
 
@@ -51,7 +51,7 @@ describe('VcsServiceFactory', () => {
       };
 
       expect(() => VcsServiceFactory.createService(config)).toThrow(
-        'Platform bitbucket is not yet supported. Currently supported platforms: github, local'
+        'Platform bitbucket is not yet supported. Currently supported platforms: github'
       );
     });
 
@@ -66,19 +66,19 @@ describe('VcsServiceFactory', () => {
   });
 
   describe('getSupportedPlatforms', () => {
-    it('should return list of supported platforms', () => {
+    it('should return list of supported VCS platforms (local handled separately)', () => {
       const platforms = VcsServiceFactory.getSupportedPlatforms();
-      expect(platforms).toEqual([VcsPlatform.GITHUB, VcsPlatform.LOCAL]);
+      expect(platforms).toEqual([VcsPlatform.GITHUB]);
     });
   });
 
   describe('isPlatformSupported', () => {
-    it('should return true for supported platforms', () => {
+    it('should return true for supported VCS platforms', () => {
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.GITHUB)).toBe(true);
-      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.LOCAL)).toBe(true);
     });
 
-    it('should return false for unsupported platforms', () => {
+    it('should return false for unsupported platforms and local (handled separately)', () => {
+      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.LOCAL)).toBe(false);
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.GITLAB)).toBe(false);
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.BITBUCKET)).toBe(false);
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.GITHUB_ENTERPRISE)).toBe(false);
