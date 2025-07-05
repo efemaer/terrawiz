@@ -1,6 +1,6 @@
 # 🧙‍♂️ TerraWiz
 
-**A blazing-fast CLI tool for discovering and analyzing Terraform modules across multiple platforms.**
+**A blazing-fast open-source CLI tool for discovering and analyzing Terraform modules across multiple platforms.**
 
 [![npm version](https://img.shields.io/npm/v/terrawiz.svg)](https://www.npmjs.com/package/terrawiz)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
