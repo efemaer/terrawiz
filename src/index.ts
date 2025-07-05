@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 
 import { program } from 'commander';
-import { GitHubService, GitHubServiceConfig } from './vcs';
-import { VcsPlatform } from './types';
+import { VcsServiceFactory, VcsServiceFactoryConfig } from './vcs';
+import { LocalFilesystemScanner } from './scanners';
 import { TerraformParser, TerragruntParser, IaCModule } from './parsers';
 import { Logger, LogLevel } from './services/logger';
+import { VcsPlatform } from './types';
+import {
+  parseSource,
+  convertLegacyToSource,
+  getPlatformDisplayName,
+  ParsedSource,
+} from './utils/source-parser';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { DEFAULT_REPO_CONCURRENCY, DEFAULT_FILE_CONCURRENCY } from './constants';
 
-// Load environment variables from .env
 dotenv.config();
-
-// Initialize the logger
 const logger = Logger.forComponent('Main');
 
 /**
@@ -20,44 +25,88 @@ const logger = Logger.forComponent('Main');
  */
 program
   .name('terrawiz')
-  .description('Track Terraform modules used in GitHub repositories')
+  .description('Track Terraform modules across various platforms (GitHub, local filesystem, etc.)')
   .version('1.0.0');
 
 program
   .command('scan')
-  .description('Scan and analyze Infrastructure as Code modules in GitHub repositories')
+  .description('Scan and analyze Infrastructure as Code modules from various sources')
+  .argument(
+    '[source]',
+    'Source to scan (platform:identifier format, e.g., github:myorg, local:/path/to/dir)'
+  )
 
-  // === Core Options ===
-  .requiredOption('-o, --org <organization>', 'GitHub organization or user name')
-  .option('-r, --repo <repository>', 'Specific repository name (scans entire org if not specified)')
+  // === Core Options (Legacy - Deprecated) ===
+  .option(
+    '-o, --org <organization>',
+    '[DEPRECATED] Use source argument instead. GitHub organization or user name'
+  )
+  .option(
+    '-r, --repo <repository>',
+    '[DEPRECATED] Use source argument instead. Specific repository name'
+  )
   .option('-p, --pattern <regex>', 'Filter repositories by name pattern')
 
-  // === Output Options ===
   .option('-f, --format <format>', 'Output format: table, json, csv', 'table')
   .option('-e, --export <file>', 'Export results to file')
-
-  // === Performance Options ===
   .option(
     '-c, --concurrency <repos:files>',
     'Concurrent processing (e.g., "5:10" for 5 repos, 10 files)',
     '5:10'
   )
   .option('--limit <number>', 'Maximum repositories to scan')
-
-  // === Filtering Options ===
   .option('--include-archived', 'Include archived repositories (default: skip)')
   .option('--terraform-only', 'Scan only Terraform (.tf) files')
   .option('--terragrunt-only', 'Scan only Terragrunt (.hcl) files')
-
-  // === Advanced Options ===
   .option('--disable-rate-limit', 'Disable GitHub API rate limiting')
   .option('--debug', 'Enable debug logging')
-  .action(async options => {
+  .action(async (source, options) => {
     try {
       // Configure logging based on debug flag
       if (options.debug) {
         Logger.getInstance({ level: LogLevel.DEBUG });
         logger.debug('Debug logging enabled');
+      }
+
+      // Handle source argument vs legacy flags
+      let parsedSource: ParsedSource;
+      if (source) {
+        // New format: positional argument
+        try {
+          parsedSource = parseSource(source);
+          logger.info(
+            `Using source: ${getPlatformDisplayName(parsedSource.platform)} - ${parsedSource.identifier}`
+          );
+        } catch (error) {
+          logger.error(`Invalid source format: ${(error as Error).message}`);
+          process.exit(1);
+        }
+      } else if (options.org) {
+        // Legacy format: deprecated flags
+        logger.warn('⚠️  DEPRECATION WARNING: --org and --repo flags are deprecated.');
+        logger.warn(
+          `   Please use the new format: terrawiz scan ${convertLegacyToSource(options.org, options.repo)}`
+        );
+        logger.warn('   The old flags will be removed in a future version.');
+
+        try {
+          const legacySource = convertLegacyToSource(options.org, options.repo);
+          parsedSource = parseSource(legacySource);
+        } catch (error) {
+          logger.error(`Error converting legacy format: ${(error as Error).message}`);
+          process.exit(1);
+        }
+      } else {
+        logger.error('Error: No source specified.');
+        logger.error('Usage: terrawiz scan <source>');
+        logger.error('Examples:');
+        logger.error('  terrawiz scan github:myorg');
+        logger.error('  terrawiz scan github:myorg/myrepo');
+        logger.error('  terrawiz scan local:/path/to/directory');
+        logger.error('');
+        logger.error('For backward compatibility, you can still use --org (deprecated):');
+        logger.error('  terrawiz scan --org myorg');
+        process.exit(1);
       }
 
       // Parse repository limit
@@ -72,8 +121,8 @@ program
       }
 
       // Parse concurrency options
-      let maxConcurrentRepos = 5;
-      let maxConcurrentFiles = 10;
+      let maxConcurrentRepos = DEFAULT_REPO_CONCURRENCY;
+      let maxConcurrentFiles = DEFAULT_FILE_CONCURRENCY;
 
       if (options.concurrency) {
         const concurrencyMatch = options.concurrency.match(/^(\d+):(\d+)$/);
@@ -123,23 +172,6 @@ program
         iacFileTypes = ['terragrunt'];
       }
 
-      // Configure GitHub service
-      const githubServiceConfig: GitHubServiceConfig = {
-        platform: VcsPlatform.GITHUB,
-        token: process.env.GITHUB_TOKEN || '',
-        debug: options.debug,
-        useRateLimit: !options.disableRateLimit,
-        skipArchived: !options.includeArchived,
-        repoPattern: options.pattern,
-        iacFileTypes,
-        maxConcurrentRepos,
-        maxConcurrentFiles,
-      };
-
-      // Initialize services
-      const githubService = new GitHubService(githubServiceConfig);
-      const terraformParser = new TerraformParser();
-
       // Log what we're scanning for
       const fileTypesDescription = options.terraformOnly
         ? 'Terraform files'
@@ -147,30 +179,81 @@ program
           ? 'Terragrunt files'
           : 'Terraform and Terragrunt files';
 
+      const targetDescription = parsedSource.repository
+        ? `${parsedSource.identifier}/${parsedSource.repository}`
+        : parsedSource.identifier;
+
       logger.info(
-        `Scanning for ${fileTypesDescription} in ${options.org}${options.repo ? `/${options.repo}` : ''}${options.pattern ? ` (filtering by pattern: ${options.pattern})` : ''}`
+        `Scanning for ${fileTypesDescription} in ${getPlatformDisplayName(parsedSource.platform)}: ${targetDescription}${options.pattern ? ` (filtering by pattern: ${options.pattern})` : ''}`
       );
 
-      // Get IaC files using the new approach
-      logger.info(`Getting repositories and extracting ${fileTypesDescription}...`);
-
+      // Route to platform-specific scanning logic
       let files;
-      if (options.repo) {
-        // Single repository
-        files = await githubService.findIacFilesForRepository(options.org, options.repo, {
+      if (parsedSource.platform === VcsPlatform.LOCAL) {
+        // Local filesystem - direct scanning, no VCS concepts
+        logger.info(`Scanning local filesystem...`);
+
+        const localScanner = new LocalFilesystemScanner({
+          maxConcurrentFiles,
+          debug: options.debug,
+        });
+
+        files = await localScanner.scanDirectory(parsedSource.identifier, {
           fileTypes: iacFileTypes,
         });
       } else {
-        // All repositories for organization
-        const repositoryFilter = {
+        // VCS platforms - use repository discovery and scanning
+        logger.info(`Getting repositories and extracting ${fileTypesDescription}...`);
+
+        // Create VCS service using factory
+        const vcsServiceConfig: VcsServiceFactoryConfig = {
+          platform: parsedSource.platform,
+          debug: options.debug,
           skipArchived: !options.includeArchived,
-          namePattern: options.pattern ? new RegExp(options.pattern) : undefined,
-          maxRepositories: maxRepos || undefined,
+          cacheEnabled: true,
+          githubToken: process.env.GITHUB_TOKEN,
+          useRateLimit: !options.disableRateLimit,
+          repoPattern: options.pattern,
+          iacFileTypes,
+          maxConcurrentRepos,
+          maxConcurrentFiles,
         };
-        const fileOptions = {
-          fileTypes: iacFileTypes,
-        };
-        files = await githubService.findAllIacFiles(options.org, repositoryFilter, fileOptions);
+
+        const vcsService = VcsServiceFactory.createService(vcsServiceConfig);
+
+        if (parsedSource.repository) {
+          // Single repository specified in source - fetch it directly
+          const targetRepo = await vcsService.getSingleRepository(
+            parsedSource.identifier,
+            parsedSource.repository
+          );
+
+          if (!targetRepo) {
+            logger.error(
+              `Repository '${parsedSource.repository}' not found in '${parsedSource.identifier}'`
+            );
+            process.exit(1);
+          }
+
+          files = await vcsService.findIacFilesInRepository(targetRepo, {
+            fileTypes: iacFileTypes,
+          });
+        } else {
+          // All repositories for organization
+          const repositoryFilter = {
+            skipArchived: !options.includeArchived,
+            namePattern: options.pattern ? new RegExp(options.pattern) : undefined,
+            maxRepositories: maxRepos || undefined,
+          };
+          const fileOptions = {
+            fileTypes: iacFileTypes,
+          };
+          files = await vcsService.findAllIacFiles(
+            parsedSource.identifier,
+            repositoryFilter,
+            fileOptions
+          );
+        }
       }
 
       if (files.length === 0) {
@@ -186,7 +269,8 @@ program
           `${terragruntFileCount} Terragrunt. Analyzing module usage...`
       );
 
-      // Initialize parsers for each type if needed
+      // Initialize parsers for module analysis
+      const terraformParser = new TerraformParser();
       const terragruntParser = new TerragruntParser();
 
       // Extract module information based on file type
@@ -226,8 +310,15 @@ program
       // Output results
       const result = {
         metadata: {
-          owner: options.org,
-          repository: options.repo || 'All repositories',
+          platform: getPlatformDisplayName(parsedSource.platform),
+          source: parsedSource.originalInput,
+          target: targetDescription,
+          scope:
+            parsedSource.platform === VcsPlatform.LOCAL
+              ? `Local directory: ${path.basename(parsedSource.identifier)}`
+              : parsedSource.repository
+                ? `Single repository: ${parsedSource.repository}`
+                : `All repositories in ${parsedSource.identifier}`,
           repoPattern: options.pattern || undefined,
           timestamp: new Date().toISOString(),
           moduleCount: allModules.length,
@@ -250,16 +341,16 @@ program
         case 'csv': {
           const csvData = allModules
             .map(m => {
-              const githubLink = `${m.fileUrl}#L${m.lineNumber}`;
+              const fileLink = `${m.fileUrl}#L${m.lineNumber}`;
               const fileType = terraformModules.some(
                 tm => tm.source === m.source && tm.filePath === m.filePath
               )
                 ? 'terraform'
                 : 'terragrunt';
-              return `"${m.source}","${m.sourceType}","${fileType}","${m.version || ''}","${m.repository}","${m.filePath}",${m.lineNumber},"${githubLink}"`;
+              return `"${m.source}","${m.sourceType}","${fileType}","${m.version || ''}","${m.repository}","${m.filePath}",${m.lineNumber},"${fileLink}"`;
             })
             .join('\n');
-          outputData = `module,source_type,file_type,version,repository,file_path,line_number,github_link\n${csvData}`;
+          outputData = `module,source_type,file_type,version,repository,file_path,line_number,file_link\n${csvData}`;
           break;
         }
         case 'table':
@@ -273,7 +364,9 @@ program
           const tableLines = [
             `\n${fileTypeStr} Module Usage Report`,
             '============================',
-            `Scope: ${options.org}${options.repo ? `/${options.repo}` : ' (organization)'}`,
+            `Platform: ${result.metadata.platform}`,
+            `Target: ${result.metadata.target}`,
+            `Scope: ${result.metadata.scope}`,
             options.pattern ? `Repository filter: ${options.pattern}` : '',
             `Total modules found: ${allModules.length}${
               !options.terraformOnly && !options.terragruntOnly

@@ -21,8 +21,11 @@ export async function processConcurrently<T, R>(
   const results: R[] = new Array(items.length);
   let currentIndex = 0;
 
+  // Ensure maxConcurrency is at least 1
+  const effectiveConcurrency = Math.max(1, maxConcurrency);
+
   // Process items in parallel batches
-  const workers = Array.from({ length: Math.min(maxConcurrency, items.length) }, async () => {
+  const workers = Array.from({ length: Math.min(effectiveConcurrency, items.length) }, async () => {
     while (currentIndex < items.length) {
       const index = currentIndex++;
       if (index < items.length) {
@@ -63,8 +66,11 @@ export async function processConcurrentlySettled<T, R>(
   let successCount = 0;
   let errorCount = 0;
 
+  // Ensure maxConcurrency is at least 1
+  const effectiveConcurrency = Math.max(1, maxConcurrency);
+
   // Process items in parallel batches
-  const workers = Array.from({ length: Math.min(maxConcurrency, items.length) }, async () => {
+  const workers = Array.from({ length: Math.min(effectiveConcurrency, items.length) }, async () => {
     while (currentIndex < items.length) {
       const index = currentIndex++;
       if (index < items.length) {

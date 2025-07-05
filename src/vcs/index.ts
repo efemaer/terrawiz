@@ -7,3 +7,6 @@ export * from './base';
 
 // GitHub implementation
 export * from './github';
+
+// Service factory
+export * from './factory';

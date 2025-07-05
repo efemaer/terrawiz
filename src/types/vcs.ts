@@ -12,6 +12,7 @@ export enum VcsPlatform {
   GITLAB_SELF_HOSTED = 'gitlab-self-hosted',
   BITBUCKET = 'bitbucket',
   BITBUCKET_SERVER = 'bitbucket-server',
+  LOCAL = 'local',
 }
 
 /**

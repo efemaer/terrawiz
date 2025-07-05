@@ -224,6 +224,56 @@ export class GitHubService extends BaseVcsService {
   }
 
   /**
+   * Get a single repository by owner and name
+   * @param owner Repository owner
+   * @param repo Repository name
+   * @returns Repository object or null if not found/archived
+   */
+  async getSingleRepository(owner: string, repo: string): Promise<VcsRepository | null> {
+    this.validateOwnerAndRepo(owner, repo);
+
+    const cacheKey = this.createCacheKey('single-repo', owner, repo);
+    const cached = this.getCachedRepository(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    try {
+      this.logger.info(`Retrieving repository ${owner}/${repo}...`);
+
+      const response = await this.octokit.repos.get({
+        owner,
+        repo,
+      });
+
+      const repository: VcsRepository = {
+        owner: response.data.owner.login,
+        name: response.data.name,
+        fullName: response.data.full_name,
+        defaultBranch: response.data.default_branch,
+        archived: response.data.archived,
+        private: response.data.private,
+        url: response.data.html_url,
+        cloneUrl: response.data.clone_url,
+      };
+
+      // Skip archived repositories if specified
+      if (this.config.skipArchived && repository.archived) {
+        this.logger.info(`Skipping archived repository: ${owner}/${repo}`);
+        this.setCachedRepository(cacheKey, null);
+        return null;
+      }
+
+      this.setCachedRepository(cacheKey, repository);
+      return repository;
+    } catch (error) {
+      this.setCachedRepository(cacheKey, null);
+      this.handleError(error, 'getSingleRepository', { owner, repo });
+      return null;
+    }
+  }
+
+  /**
    * Get all repositories for an organization or user
    * @param owner Organization or user name
    * @param filter Optional filtering criteria

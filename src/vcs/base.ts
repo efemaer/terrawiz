@@ -14,6 +14,8 @@ import {
 } from '../types';
 import { Logger } from '../services/logger';
 import { processConcurrentlySettled } from '../utils/concurrent';
+import { getIacFileType } from '../utils/file-type-detector';
+import { DEFAULT_MAX_RETRIES, MAX_BACKOFF_MS, BASE_BACKOFF_MS } from '../constants';
 
 /**
  * Configuration for VCS services
@@ -27,15 +29,7 @@ export interface BaseVcsConfig {
 }
 
 /**
- * Abstract base class for VCS services providing common patterns
- *
- * This class provides:
- * - Standardized logging with component context
- * - Common error handling and VcsError creation
- * - IaC file type detection and filtering
- * - Repository caching to avoid redundant API calls
- * - Common validation methods
- * - Template methods for common workflows
+ * Abstract base class for VCS services with common patterns and utilities
  */
 export abstract class BaseVcsService {
   protected logger!: Logger;
@@ -74,6 +68,7 @@ export abstract class BaseVcsService {
   // Abstract methods that must be implemented by concrete classes
   abstract repositoryExists(owner: string, name: string): Promise<boolean | null>;
   abstract getRepositories(owner: string, filter?: VcsRepositoryFilter): Promise<VcsRepository[]>;
+  abstract getSingleRepository(owner: string, repo: string): Promise<VcsRepository | null>;
   abstract findIacFilesInRepository(
     repository: VcsRepository,
     options?: VcsFileDiscoveryOptions
@@ -171,7 +166,7 @@ export abstract class BaseVcsService {
   protected async executeWithRetry<T>(
     operation: () => Promise<T>,
     operationName: string,
-    maxRetries: number = this.config.maxRetries || 3
+    maxRetries: number = this.config.maxRetries || DEFAULT_MAX_RETRIES
   ): Promise<T> {
     let lastError: Error | undefined;
 
@@ -188,7 +183,7 @@ export abstract class BaseVcsService {
         }
 
         // Simple exponential backoff
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        const delay = Math.min(BASE_BACKOFF_MS * Math.pow(2, attempt - 1), MAX_BACKOFF_MS);
         this.logger.warn(`Operation ${operationName} failed, retrying in ${delay}ms`, {
           attempt,
           error: lastError.message,
@@ -281,13 +276,7 @@ export abstract class BaseVcsService {
    * Helper method to determine IaC file type from path
    */
   protected getIacFileType(path: string): IacFileType | null {
-    if (path.endsWith('.tf')) {
-      return 'terraform';
-    }
-    if (path.endsWith('.hcl')) {
-      return 'terragrunt';
-    }
-    return null;
+    return getIacFileType(path);
   }
 
   /**
