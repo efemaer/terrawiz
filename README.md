@@ -344,14 +344,13 @@ Modules by File Type:
 
 ### CSV Format
 
-```csv
-module,source_type,file_type,version,repository,file_path,line_number,file_link
-"terraform-aws-modules/vpc/aws","registry","terraform","~> 5.0","infrastructure-core","networking/vpc.tf",12,"https://github.com/mycompany/infrastructure-core/blob/main/networking/vpc.tf#L12"
-"terraform-aws-modules/vpc/aws","registry","terraform","~> 4.0","legacy-infra","main.tf",8,"https://github.com/mycompany/legacy-infra/blob/main/main.tf#L8"
-"./modules/networking","local","terraform","","app-platform","main.tf",25,"https://github.com/mycompany/app-platform/blob/main/main.tf#L25"
-"./modules/networking","local","terragrunt","","service-mesh","terragrunt.hcl",15,"https://github.com/mycompany/service-mesh/blob/main/terragrunt.hcl#L15"
-"git::github.com/company/terraform-modules.git//s3?ref=v2.0","git","terraform","ref=v2.0","data-storage","storage.tf",8,"https://github.com/mycompany/data-storage/blob/main/storage.tf#L8"
-```
+| Module                                                        | Source Type | File Type | Version   | Repository          | File Path           | Line | File Link                                                                                               |
+|---------------------------------------------------------------|-------------|-----------|-----------|---------------------|---------------------|------|---------------------------------------------------------------------------------------------------------|
+| `terraform-aws-modules/vpc/aws`                              | registry    | terraform | `~> 5.0`  | infrastructure-core | `networking/vpc.tf` | 12   | https://github.com/mycompany/infrastructure-core/blob/main/networking/vpc.tf#L12                       |
+| `terraform-aws-modules/vpc/aws`                              | registry    | terraform | `~> 4.0`  | legacy-infra        | `main.tf`           | 8    | https://github.com/mycompany/legacy-infra/blob/main/main.tf#L8                                         |
+| `./modules/networking`                                        | local       | terraform | -         | app-platform        | `main.tf`           | 25   | https://github.com/mycompany/app-platform/blob/main/main.tf#L25                                        |
+| `./modules/networking`                                        | local       | terragrunt| -         | service-mesh        | `terragrunt.hcl`    | 15   | https://github.com/mycompany/service-mesh/blob/main/terragrunt.hcl#L15                                 |
+| `git::github.com/company/terraform-modules.git//s3?ref=v2.0` | git         | terraform | `ref=v2.0`| data-storage        | `storage.tf`        | 8    | https://github.com/mycompany/data-storage/blob/main/storage.tf#L8                                      |
 
 ## 🗺️ Roadmap
 
