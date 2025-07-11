@@ -57,7 +57,7 @@ jest.config.js
 eslint.config.*
 
 # TypeScript config
-tsconfig.json
+# tsconfig.json
 
 # Package lock (we copy package*.json explicitly)
 # Uncomment if you want to exclude lock files
