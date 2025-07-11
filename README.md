@@ -1,4 +1,4 @@
-# 🧙‍♂️ TerraWiz
+# 🧙‍♂️ Terrawiz
 
 **A blazing-fast open-source CLI tool for discovering and analyzing Terraform modules across multiple platforms.**
 
@@ -7,7 +7,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-TerraWiz performs source-code scanning across GitHub organizations, local directories, and other platforms to find all Terraform and Terragrunt module usage. It identifies module sources (registry, local, git), tracks versions, and generates comprehensive reports in table, JSON, or CSV formats. Perfect for infrastructure audits, dependency tracking, security reviews, and understanding your IaC module ecosystem at scale.
+Terrawiz performs source-code scanning across GitHub organizations, local directories, and other platforms to find all Terraform and Terragrunt module usage. It identifies module sources (registry, local, git), tracks versions, and generates comprehensive reports in table, JSON, or CSV formats. Perfect for infrastructure audits, dependency tracking, security reviews, and understanding your IaC module ecosystem at scale.
 
 ---
 
@@ -43,7 +43,17 @@ npm install -g terrawiz
 npx terrawiz scan github:your-org
 ```
 
-#### Option 2: Build from Source
+#### Option 2: Docker Container (Recommended for CI/CD)
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/efemaer/terrawiz:latest
+
+# Or build locally
+docker build -t terrawiz .
+```
+
+#### Option 3: Build from Source
 
 ```bash
 # Clone and build
@@ -72,6 +82,8 @@ No additional setup required - just ensure you have read access to the target di
 
 ### Basic Usage
 
+#### Command Line
+
 ```bash
 # Scan GitHub organization
 terrawiz scan github:your-org
@@ -89,6 +101,27 @@ terrawiz scan github:your-org -f csv -e modules.csv -c 10:20
 terrawiz scan local:./infrastructure
 ```
 
+#### Docker Usage
+
+```bash
+# Scan GitHub organization (with token from environment)
+docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN ghcr.io/efemaer/terrawiz:latest scan github:your-org
+
+# Scan local directory (mount as volume)
+docker run --rm -v /path/to/terraform:/workspace ghcr.io/efemaer/terrawiz:latest scan local:/workspace
+
+# Export results to host machine
+docker run --rm -v /path/to/terraform:/workspace -v $(pwd):/output \
+  ghcr.io/efemaer/terrawiz:latest scan local:/workspace -f csv -e /output/modules.csv
+
+# Use environment file
+docker run --rm --env-file .env ghcr.io/efemaer/terrawiz:latest scan github:your-org
+
+# Interactive debugging
+docker run --rm -it -e GITHUB_TOKEN=$GITHUB_TOKEN \
+  ghcr.io/efemaer/terrawiz:latest scan github:your-org --debug --limit 3
+```
+
 ## 📖 CLI Reference
 
 ### Core Command
@@ -99,7 +132,7 @@ terrawiz scan <source> [options]
 
 ### Sources
 
-TerraWiz uses a URI-style format to specify what to scan:
+Terrawiz uses a URI-style format to specify what to scan:
 
 | Format            | Description                          | Examples                     |
 | ----------------- | ------------------------------------ | ---------------------------- |
@@ -203,6 +236,7 @@ terrawiz scan local:. --debug
 
 ### Local Filesystem Features
 
+#### Command Line
 ```bash
 # Scan current directory
 terrawiz scan local:.
@@ -218,6 +252,24 @@ terrawiz scan local:/projects/terraform --terraform-only
 
 # High concurrency for large local directories
 terrawiz scan local:/enterprise/iac -c 1:20
+```
+
+#### Docker Examples
+```bash
+# Scan current directory
+docker run --rm -v $(pwd):/workspace ghcr.io/efemaer/terrawiz:latest scan local:/workspace
+
+# Export to host with absolute path
+docker run --rm -v /home/user/terraform:/workspace -v /home/user/reports:/output \
+  ghcr.io/efemaer/terrawiz:latest scan local:/workspace -f json -e /output/modules.json
+
+# Filter file types in container
+docker run --rm -v $(pwd):/workspace \
+  ghcr.io/efemaer/terrawiz:latest scan local:/workspace --terraform-only
+
+# High concurrency for large directories
+docker run --rm -v /enterprise/iac:/workspace \
+  ghcr.io/efemaer/terrawiz:latest scan local:/workspace -c 1:20
 ```
 
 **Local Filesystem Benefits:**
@@ -378,7 +430,7 @@ Modules by File Type:
 
 ## 🏗️ Architecture
 
-TerraWiz features a clean, modular architecture:
+Terrawiz features a clean, modular architecture:
 
 ```
 src/
@@ -413,7 +465,7 @@ src/
 
 ## 🧪 Module Source Detection
 
-TerraWiz automatically categorizes modules by source type:
+Terrawiz automatically categorizes modules by source type:
 
 | Type            | Examples                            | Description                |
 | --------------- | ----------------------------------- | -------------------------- |
