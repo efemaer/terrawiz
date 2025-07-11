@@ -91,4 +91,4 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Show published Docker images
-        run: echo "Published Docker images with tags: ${{ steps.meta.outputs.tags }}"
+        run: echo "Published Docker images with tags – ${{ steps.meta.outputs.tags }}"
