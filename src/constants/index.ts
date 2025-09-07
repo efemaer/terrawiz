@@ -29,6 +29,42 @@ export const SKIP_DIRECTORIES = [
 ];
 
 /**
+ * API Configuration Constants
+ */
+export const API_DEFAULTS = {
+  GITHUB_PER_PAGE: 100,
+  GITLAB_MAX_PAGES: 10,
+  GITLAB_PER_PAGE: 100,
+  REQUEST_TIMEOUT: 30000,
+} as const;
+
+/**
+ * File Extension Constants
+ */
+export const FILE_EXTENSIONS = {
+  TERRAFORM: ['.tf', '.tfvars'],
+  TERRAGRUNT: ['.hcl'],
+  TERRAFORM_LOCK: '.terraform.lock.hcl',
+} as const;
+
+/**
+ * Progress Reporting Thresholds
+ */
+export const PROGRESS_THRESHOLDS = {
+  LARGE_FILE_SET: 10,
+  PROGRESS_INTERVAL: 10,
+} as const;
+
+/**
+ * VCS Platform Constants
+ */
+export const VCS_CONSTANTS = {
+  GITHUB_API_VERSION: '2022-11-28',
+  GITLAB_API_VERSION: 'v4',
+  DEFAULT_BRANCH_NAMES: ['main', 'master', 'develop'],
+} as const;
+
+/**
  * Log levels for debugging
  */
 export const LOG_LEVELS = {

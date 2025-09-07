@@ -1,6 +1,3 @@
-/**
- * Simplified base VCS service focusing on common business logic patterns
- */
 
 import {
   IacFile,
@@ -17,9 +14,6 @@ import { processConcurrentlySettled } from '../utils/concurrent';
 import { getIacFileType } from '../utils/file-type-detector';
 import { DEFAULT_MAX_RETRIES, MAX_BACKOFF_MS, BASE_BACKOFF_MS } from '../constants';
 
-/**
- * Configuration for VCS services
- */
 export interface BaseVcsConfig {
   readonly platform: VcsPlatform;
   readonly debug?: boolean;
@@ -28,9 +22,6 @@ export interface BaseVcsConfig {
   readonly cacheEnabled?: boolean;
 }
 
-/**
- * Abstract base class for VCS services with common patterns and utilities
- */
 export abstract class BaseVcsService {
   protected logger!: Logger;
   protected readonly config: BaseVcsConfig;
@@ -44,6 +35,13 @@ export abstract class BaseVcsService {
     const logLevel = config.debug ? 3 : 2; // DEBUG : INFO
     Logger.getInstance({ level: logLevel });
     // Note: this.logger will be set in child class constructor after platformName is available
+  }
+
+  /**
+   * Get the platform for this VCS service
+   */
+  get platform(): VcsPlatform {
+    return this.config.platform;
   }
 
   /**

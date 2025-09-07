@@ -5,8 +5,9 @@
 // Base VCS functionality
 export * from './base';
 
-// GitHub implementation
+// Platform implementations
 export * from './github';
+export * from './gitlab';
 
 // Service factory
 export * from './factory';

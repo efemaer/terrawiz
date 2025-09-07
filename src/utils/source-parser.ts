@@ -8,6 +8,7 @@ export interface ParsedSource {
   platform: VcsPlatform;
   identifier: string; // org/group/path
   repository?: string; // specific repo if provided
+  host?: string; // custom host for self-hosted instances
   originalInput: string;
 }
 
@@ -17,6 +18,7 @@ export interface ParsedSource {
  * Supported formats:
  * - github:org[/repo]
  * - gitlab:group[/project]
+ * - gitlab://custom-host.com/group[/project] (self-hosted)
  * - bitbucket:workspace[/repo]
  * - local:/absolute/path
  * - local:./relative/path
@@ -25,6 +27,11 @@ export interface ParsedSource {
 export function parseSource(source: string): ParsedSource {
   if (!source || typeof source !== 'string') {
     throw new Error('Source must be a non-empty string');
+  }
+
+  // Check for URL-style format (e.g., gitlab://custom-host.com/group/project)
+  if (source.includes('://')) {
+    return parseUrlStyleSource(source);
   }
 
   const colonIndex = source.indexOf(':');
@@ -49,6 +56,52 @@ export function parseSource(source: string): ParsedSource {
     return parseLocalSource(source, remainder);
   } else {
     return parseVcsSource(source, platform, remainder);
+  }
+}
+
+/**
+ * Parse URL-style source (e.g., gitlab://custom-host.com/group/project)
+ */
+function parseUrlStyleSource(originalInput: string): ParsedSource {
+  try {
+    const url = new URL(originalInput);
+    const protocol = url.protocol.slice(0, -1); // Remove trailing ':'
+
+    // Validate and normalize platform
+    const platform = validateAndNormalizePlatform(protocol);
+
+    // Extract path components
+    const pathParts = url.pathname.split('/').filter(part => part.length > 0);
+
+    if (pathParts.length === 0) {
+      throw new Error(`Invalid URL: missing group/organization in path`);
+    }
+
+    const identifier = pathParts[0];
+    const repository = pathParts.length > 1 ? pathParts.slice(1).join('/') : undefined;
+
+    // For self-hosted instances, determine the platform variant
+    let adjustedPlatform = platform;
+    if (platform === VcsPlatform.GITLAB && url.hostname !== 'gitlab.com') {
+      adjustedPlatform = VcsPlatform.GITLAB_SELF_HOSTED;
+    } else if (platform === VcsPlatform.GITHUB && url.hostname !== 'github.com') {
+      adjustedPlatform = VcsPlatform.GITHUB_SELF_HOSTED;
+    }
+
+    // Construct the host URL manually since platform:// is not a standard protocol
+    const host = `https://${url.hostname}${url.port ? `:${url.port}` : ''}`;
+
+    return {
+      platform: adjustedPlatform,
+      identifier,
+      repository,
+      host,
+      originalInput,
+    };
+  } catch (error) {
+    throw new Error(
+      `Invalid URL format: "${originalInput}". ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -170,11 +223,11 @@ export function convertLegacyToSource(org: string, repo?: string): string {
 export function getPlatformDisplayName(platform: VcsPlatform): string {
   const displayNames: Record<VcsPlatform, string> = {
     [VcsPlatform.GITHUB]: 'GitHub',
-    [VcsPlatform.GITHUB_ENTERPRISE]: 'GitHub Enterprise',
+    [VcsPlatform.GITHUB_SELF_HOSTED]: 'GitHub Self-Hosted',
     [VcsPlatform.GITLAB]: 'GitLab',
     [VcsPlatform.GITLAB_SELF_HOSTED]: 'GitLab Self-Hosted',
     [VcsPlatform.BITBUCKET]: 'Bitbucket',
-    [VcsPlatform.BITBUCKET_SERVER]: 'Bitbucket Server',
+    [VcsPlatform.BITBUCKET_SELF_HOSTED]: 'Bitbucket Self-Hosted',
     [VcsPlatform.LOCAL]: 'Local Filesystem',
   };
 

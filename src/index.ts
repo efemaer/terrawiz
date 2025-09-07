@@ -25,7 +25,9 @@ const logger = Logger.forComponent('Main');
  */
 program
   .name('terrawiz')
-  .description('Track Terraform modules across various platforms (GitHub, local filesystem, etc.)')
+  .description(
+    'Track Terraform modules across version control platforms and local filesystems'
+  )
   .version('1.0.0');
 
 program
@@ -39,7 +41,7 @@ program
   // === Core Options (Legacy - Deprecated) ===
   .option(
     '-o, --org <organization>',
-    '[DEPRECATED] Use source argument instead. GitHub organization or user name'
+'[DEPRECATED] Use source argument instead. Organization or user name'
   )
   .option(
     '-r, --repo <repository>',
@@ -55,10 +57,10 @@ program
     '5:10'
   )
   .option('--limit <number>', 'Maximum repositories to scan')
-  .option('--include-archived', 'Include archived repositories (default: skip)')
+  .option('--include-archived', 'Include archived repositories (default: skip archived)')
   .option('--terraform-only', 'Scan only Terraform (.tf) files')
   .option('--terragrunt-only', 'Scan only Terragrunt (.hcl) files')
-  .option('--disable-rate-limit', 'Disable GitHub API rate limiting')
+  .option('--disable-rate-limit', 'Disable API rate limiting')
   .option('--debug', 'Enable debug logging')
   .action(async (source, options) => {
     try {
@@ -85,7 +87,7 @@ program
         // Legacy format: deprecated flags
         logger.warn('⚠️  DEPRECATION WARNING: --org and --repo flags are deprecated.');
         logger.warn(
-          `   Please use the new format: terrawiz scan ${convertLegacyToSource(options.org, options.repo)}`
+          `   Please use the new source format: terrawiz scan ${convertLegacyToSource(options.org, options.repo)}`
         );
         logger.warn('   The old flags will be removed in a future version.');
 
@@ -101,6 +103,8 @@ program
         logger.error('Usage: terrawiz scan <source>');
         logger.error('Examples:');
         logger.error('  terrawiz scan github:myorg');
+        logger.error('  terrawiz scan gitlab:mygroup');
+        logger.error('  terrawiz scan gitlab://gitlab.company.com/mygroup');
         logger.error('  terrawiz scan github:myorg/myrepo');
         logger.error('  terrawiz scan local:/path/to/directory');
         logger.error('');
@@ -212,6 +216,9 @@ program
           skipArchived: !options.includeArchived,
           cacheEnabled: true,
           githubToken: process.env.GITHUB_TOKEN,
+          githubHost: parsedSource.host,
+          gitlabToken: process.env.GITLAB_TOKEN,
+          gitlabHost: parsedSource.host,
           useRateLimit: !options.disableRateLimit,
           repoPattern: options.pattern,
           iacFileTypes,

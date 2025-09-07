@@ -244,7 +244,7 @@ export class VcsConfigBuilder {
   }
 
   static githubEnterprise(baseUrl: string): VcsConfigBuilder {
-    return new VcsConfigBuilder().withPlatform(VcsPlatform.GITHUB_ENTERPRISE).withBaseUrl(baseUrl);
+    return new VcsConfigBuilder().withPlatform(VcsPlatform.GITHUB_SELF_HOSTED).withBaseUrl(baseUrl);
   }
 
   static gitlab(): VcsConfigBuilder {

@@ -24,6 +24,7 @@
     "terraform",
     "terragrunt",
     "github",
+    "gitlab",
     "modules",
     "tracking",
     "iac",
@@ -32,8 +33,9 @@
   "author": "Mansour Kheffache",
   "repository": "github:efemaer/terrawiz",
   "license": "MIT",
-  "description": "A tool to track and analyze Terraform modules used in GitHub repositories",
+  "description": "A tool to track and analyze Terraform modules used in GitHub and GitLab repositories",
   "dependencies": {
+    "@gitbeaker/rest": "^43.5.0",
     "@octokit/core": "^7.0.2",
     "@octokit/plugin-throttling": "^11.0.1",
     "@octokit/rest": "^22.0.0",

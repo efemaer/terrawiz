@@ -13,12 +13,16 @@ import {
   VcsErrorType,
 } from '../types';
 import { processConcurrentlySettled } from '../utils/concurrent';
+import { isNotFoundError } from '../utils/error-handler';
+import { 
+  mapToVcsRepository, 
+  createGitHubRawRepository, 
+  createRepositoryCacheKey 
+} from '../utils/repository-mapper';
+import { API_DEFAULTS } from '../constants';
 
 dotenv.config();
 
-/**
- * GitHub API repository response structure
- */
 interface GitHubRepo {
   name: string;
   full_name: string;
@@ -28,11 +32,10 @@ interface GitHubRepo {
   default_branch: string;
   archived: boolean;
   private: boolean;
+  html_url: string;
+  clone_url: string;
 }
 
-/**
- * GitHub API tree item response structure
- */
 interface GitHubTreeItem {
   path?: string;
   mode?: string;
@@ -42,27 +45,16 @@ interface GitHubTreeItem {
   url?: string;
 }
 
-/**
- * Configuration options for the GitHub service
- */
 export interface GitHubServiceConfig extends BaseVcsConfig {
-  /** GitHub authentication token */
   token: string;
-  /** Use rate limit protection (default: true) */
+  host?: string;
   useRateLimit?: boolean;
-  /** Filter repositories by name using regex pattern */
   repoPattern?: string;
-  /** Types of IaC files to scan for (default: ['terraform', 'terragrunt']) */
   iacFileTypes?: readonly IacFileType[];
-  /** Maximum concurrent repositories to process (default: 5) */
   maxConcurrentRepos?: number;
-  /** Maximum concurrent files to process per repository (default: 10) */
   maxConcurrentFiles?: number;
 }
 
-/**
- * GitHub VCS service implementation
- */
 export class GitHubService extends BaseVcsService {
   private octokit!: Octokit;
   private useRateLimit: boolean;
@@ -70,10 +62,8 @@ export class GitHubService extends BaseVcsService {
   private iacFileTypes: readonly IacFileType[];
   private maxConcurrentRepos: number;
   private maxConcurrentFiles: number;
+  private host?: string;
 
-  /**
-   * Get concurrency limits for parallel processing
-   */
   protected getConcurrencyLimits(): { repos: number; files: number } {
     return {
       repos: this.maxConcurrentRepos,
@@ -81,9 +71,6 @@ export class GitHubService extends BaseVcsService {
     };
   }
 
-  /**
-   * Create a new GitHubService instance
-   */
   constructor(config: GitHubServiceConfig) {
     super({
       platform: VcsPlatform.GITHUB,
@@ -93,10 +80,23 @@ export class GitHubService extends BaseVcsService {
       cacheEnabled: config.cacheEnabled,
     });
 
+    this.host = config.host;
     this.useRateLimit = config.useRateLimit !== false; // Default to true
     this.iacFileTypes = config.iacFileTypes || ['terraform', 'terragrunt'];
     this.maxConcurrentRepos = config.maxConcurrentRepos || 5;
     this.maxConcurrentFiles = config.maxConcurrentFiles || 10;
+
+    // Validate GitHub token
+    const token = config.token || process.env.GITHUB_TOKEN;
+    if (!token) {
+      throw new VcsError(
+        'GitHub token not found. Please provide token in config or set GITHUB_TOKEN environment variable',
+        VcsErrorType.INVALID_CONFIGURATION,
+        VcsPlatform.GITHUB
+      );
+    }
+
+    this.initializeLogger();
 
     // Initialize repository pattern filter if provided
     if (config.repoPattern) {
@@ -113,36 +113,22 @@ export class GitHubService extends BaseVcsService {
         );
       }
     }
-
-    // Validate GitHub token
-    const token = config.token || process.env.GITHUB_TOKEN;
-    if (!token) {
-      throw new VcsError(
-        'GitHub token not found. Please provide token in config or set GITHUB_TOKEN environment variable',
-        VcsErrorType.INVALID_CONFIGURATION,
-        VcsPlatform.GITHUB
-      );
-    }
-
-    this.initializeLogger();
     this.initializeOctokit(token);
     this.logger.info('GitHub service initialized successfully');
   }
 
   get platformName(): string {
-    return 'GitHub';
+    return this.host ? `GitHub (${this.host})` : 'GitHub';
   }
 
-  /**
-   * Initialize Octokit with appropriate configuration
-   */
   private initializeOctokit(token: string): void {
     if (this.useRateLimit) {
       const CustomOctokit = Octokit.plugin(throttling);
-      this.octokit = new CustomOctokit({
+      const octokitConfig = {
         auth: token,
+        ...(this.host && { baseUrl: `${this.host}/api/v3` }),
         throttle: {
-          onRateLimit: (retryAfter, options, octokit, retryCount) => {
+          onRateLimit: (retryAfter: number, options: any, octokit: any, retryCount: number) => {
             this.logger.warn(`Request quota exhausted for ${options.method} ${options.url}`);
 
             if (retryCount < 1) {
@@ -153,15 +139,20 @@ export class GitHubService extends BaseVcsService {
             this.logger.error(`Rate limit exceeded, no more retries left`);
             return false;
           },
-          onSecondaryRateLimit: (retryAfter, options, _octokit) => {
+          onSecondaryRateLimit: (retryAfter: number, options: any, _octokit: any) => {
             this.logger.warn(`Secondary rate limit triggered for ${options.method} ${options.url}`);
             return false;
           },
         },
-      });
+      };
+      this.octokit = new CustomOctokit(octokitConfig);
       this.logger.debug('GitHub service initialized with rate limit protection');
     } else {
-      this.octokit = new Octokit({ auth: token });
+      const octokitConfig = {
+        auth: token,
+        ...(this.host && { baseUrl: `${this.host}/api/v3` }),
+      };
+      this.octokit = new Octokit(octokitConfig);
       this.logger.debug('GitHub service initialized without rate limit protection');
     }
   }
@@ -175,7 +166,7 @@ export class GitHubService extends BaseVcsService {
   async repositoryExists(owner: string, repo: string): Promise<boolean | null> {
     this.validateOwnerAndRepo(owner, repo);
 
-    const cacheKey = this.createCacheKey('repo-exists', owner, repo);
+    const cacheKey = createRepositoryCacheKey('github', 'repo-exists', owner, repo);
     const cached = this.getCachedRepository(cacheKey);
     if (cached !== undefined) {
       return cached !== null;
@@ -218,21 +209,18 @@ export class GitHubService extends BaseVcsService {
       return true;
     } catch (error) {
       this.setCachedRepository(cacheKey, null);
+      if (isNotFoundError(error, this.platform)) {
+        return false;
+      }
       this.handleError(error, 'repositoryExists', { owner, repo });
       return null;
     }
   }
 
-  /**
-   * Get a single repository by owner and name
-   * @param owner Repository owner
-   * @param repo Repository name
-   * @returns Repository object or null if not found/archived
-   */
   async getSingleRepository(owner: string, repo: string): Promise<VcsRepository | null> {
     this.validateOwnerAndRepo(owner, repo);
 
-    const cacheKey = this.createCacheKey('single-repo', owner, repo);
+    const cacheKey = createRepositoryCacheKey('github', 'single-repo', owner, repo);
     const cached = this.getCachedRepository(cacheKey);
     if (cached !== undefined) {
       return cached;
@@ -268,23 +256,21 @@ export class GitHubService extends BaseVcsService {
       return repository;
     } catch (error) {
       this.setCachedRepository(cacheKey, null);
+      if (isNotFoundError(error, this.platform)) {
+        return null;
+      }
       this.handleError(error, 'getSingleRepository', { owner, repo });
       return null;
     }
   }
 
-  /**
-   * Get all repositories for an organization or user
-   * @param owner Organization or user name
-   * @param filter Optional filtering criteria
-   */
   async getRepositories(owner: string, filter?: VcsRepositoryFilter): Promise<VcsRepository[]> {
     try {
       this.logger.info(`Retrieving repositories for ${owner}...`);
 
       const repositories: VcsRepository[] = [];
       const maxRepos = filter?.maxRepositories;
-      const perPage = 100;
+      const perPage = API_DEFAULTS.GITHUB_PER_PAGE;
       // Track skipped repositories for reporting
       let skippedArchivedCount = 0;
       let skippedPatternCount = 0;
@@ -365,17 +351,10 @@ export class GitHubService extends BaseVcsService {
           return true;
         });
 
-        // Map to our VcsRepository format
-        const repoInfos: VcsRepository[] = filteredRepos.map((repo: GitHubRepo) => ({
-          owner: repo.owner.login,
-          name: repo.name,
-          fullName: repo.full_name,
-          defaultBranch: repo.default_branch,
-          archived: repo.archived,
-          private: repo.private || false,
-          url: `https://github.com/${repo.full_name}`,
-          cloneUrl: `https://github.com/${repo.full_name}.git`,
-        }));
+        // Map to our VcsRepository format using shared utility
+        const repoInfos: VcsRepository[] = filteredRepos.map((repo: GitHubRepo) => 
+          mapToVcsRepository(createGitHubRawRepository(repo))
+        );
 
         repositories.push(...repoInfos);
 
@@ -409,11 +388,6 @@ export class GitHubService extends BaseVcsService {
     }
   }
 
-  /**
-   * Find all IaC files in a repository
-   * @param repository Repository information
-   * @param options File discovery options
-   */
   async findIacFilesInRepository(
     repository: VcsRepository,
     options?: VcsFileDiscoveryOptions
@@ -548,12 +522,6 @@ export class GitHubService extends BaseVcsService {
     }
   }
 
-  /**
-   * Find all IaC files for a specific repository
-   * @param owner Repository owner
-   * @param repo Repository name
-   * @param options File discovery options
-   */
   async findIacFilesForRepository(
     owner: string,
     repo: string,
@@ -589,12 +557,6 @@ export class GitHubService extends BaseVcsService {
     }
   }
 
-  /**
-   * Get content of a file from GitHub
-   * @param owner Repository owner
-   * @param repo Repository name
-   * @param path File path
-   */
   private async getFileContent(owner: string, repo: string, path: string): Promise<string> {
     try {
       const response = await this.octokit.repos.getContent({
@@ -618,4 +580,5 @@ export class GitHubService extends BaseVcsService {
       return '';
     }
   }
+
 }

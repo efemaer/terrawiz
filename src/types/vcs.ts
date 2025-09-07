@@ -7,11 +7,11 @@
  */
 export enum VcsPlatform {
   GITHUB = 'github',
-  GITHUB_ENTERPRISE = 'github-enterprise',
+  GITHUB_SELF_HOSTED = 'github-self-hosted',
   GITLAB = 'gitlab',
   GITLAB_SELF_HOSTED = 'gitlab-self-hosted',
   BITBUCKET = 'bitbucket',
-  BITBUCKET_SERVER = 'bitbucket-server',
+  BITBUCKET_SELF_HOSTED = 'bitbucket-self-hosted',
   LOCAL = 'local',
 }
 
