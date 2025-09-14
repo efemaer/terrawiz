@@ -147,6 +147,62 @@ describe('Source Parser', () => {
       });
     });
 
+    describe('GitLab URL format', () => {
+      it('should parse GitLab.com URL format', () => {
+        const result = parseSource('gitlab://gitlab.com/my-group/my-project');
+        expect(result).toEqual({
+          platform: VcsPlatform.GITLAB,
+          identifier: 'my-group',
+          repository: 'my-project',
+          host: 'https://gitlab.com',
+          originalInput: 'gitlab://gitlab.com/my-group/my-project',
+        });
+      });
+
+      it('should parse self-hosted GitLab URL format', () => {
+        const result = parseSource('gitlab://gitlab.example.com/my-group/my-project');
+        expect(result).toEqual({
+          platform: VcsPlatform.GITLAB_SELF_HOSTED,
+          identifier: 'my-group',
+          repository: 'my-project',
+          host: 'https://gitlab.example.com',
+          originalInput: 'gitlab://gitlab.example.com/my-group/my-project',
+        });
+      });
+
+      it('should parse GitLab URL with just group', () => {
+        const result = parseSource('gitlab://gitlab.example.com/my-group');
+        expect(result).toEqual({
+          platform: VcsPlatform.GITLAB_SELF_HOSTED,
+          identifier: 'my-group',
+          repository: undefined,
+          host: 'https://gitlab.example.com',
+          originalInput: 'gitlab://gitlab.example.com/my-group',
+        });
+      });
+
+      it('should parse GitLab URL with nested group path', () => {
+        const result = parseSource('gitlab://gitlab.example.com/parent-group/sub-group/project');
+        expect(result).toEqual({
+          platform: VcsPlatform.GITLAB_SELF_HOSTED,
+          identifier: 'parent-group',
+          repository: 'sub-group/project',
+          host: 'https://gitlab.example.com',
+          originalInput: 'gitlab://gitlab.example.com/parent-group/sub-group/project',
+        });
+      });
+
+      it('should throw error for invalid GitLab URL format', () => {
+        expect(() => parseSource('gitlab://gitlab.example.com')).toThrow(
+          'Invalid URL: missing group/organization in path'
+        );
+      });
+
+      it('should throw error for malformed URL', () => {
+        expect(() => parseSource('gitlab://[invalid-url]')).toThrow('Invalid URL format');
+      });
+    });
+
     describe('Error cases', () => {
       it('should throw error for empty source', () => {
         expect(() => parseSource('')).toThrow('Source must be a non-empty string');
@@ -215,11 +271,13 @@ describe('Source Parser', () => {
   describe('getPlatformDisplayName', () => {
     it('should return display names for all platforms', () => {
       expect(getPlatformDisplayName(VcsPlatform.GITHUB)).toBe('GitHub');
-      expect(getPlatformDisplayName(VcsPlatform.GITHUB_ENTERPRISE)).toBe('GitHub Enterprise');
+      expect(getPlatformDisplayName(VcsPlatform.GITHUB_SELF_HOSTED)).toBe('GitHub Self-Hosted');
       expect(getPlatformDisplayName(VcsPlatform.GITLAB)).toBe('GitLab');
       expect(getPlatformDisplayName(VcsPlatform.GITLAB_SELF_HOSTED)).toBe('GitLab Self-Hosted');
       expect(getPlatformDisplayName(VcsPlatform.BITBUCKET)).toBe('Bitbucket');
-      expect(getPlatformDisplayName(VcsPlatform.BITBUCKET_SERVER)).toBe('Bitbucket Server');
+      expect(getPlatformDisplayName(VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(
+        'Bitbucket Self-Hosted'
+      );
       expect(getPlatformDisplayName(VcsPlatform.LOCAL)).toBe('Local Filesystem');
     });
   });

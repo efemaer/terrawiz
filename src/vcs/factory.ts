@@ -1,5 +1,6 @@
 import { VcsPlatform } from '../types';
 import { GitHubService, GitHubServiceConfig } from './github';
+import { GitLabService, GitLabServiceConfig } from './gitlab';
 import { BaseVcsService } from './base';
 
 /**
@@ -12,26 +13,30 @@ export interface VcsServiceFactoryConfig {
   maxRetries?: number;
   cacheEnabled?: boolean;
 
-  // GitHub-specific options
-  githubToken?: string;
-  useRateLimit?: boolean;
+  // Common options
   repoPattern?: string;
   iacFileTypes?: readonly ('terraform' | 'terragrunt')[];
   maxConcurrentRepos?: number;
   maxConcurrentFiles?: number;
+  useRateLimit?: boolean;
+
+  // Platform-specific options
+  githubToken?: string;
+  githubHost?: string;
+  gitlabToken?: string;
+  gitlabHost?: string;
 }
 
-/**
- * Factory for creating VCS service instances based on platform
- */
 export class VcsServiceFactory {
-  /**
-   * Create a VCS service instance for the specified platform
-   */
   static createService(config: VcsServiceFactoryConfig): BaseVcsService {
     switch (config.platform) {
       case VcsPlatform.GITHUB:
+      case VcsPlatform.GITHUB_SELF_HOSTED:
         return VcsServiceFactory.createGitHubService(config);
+
+      case VcsPlatform.GITLAB:
+      case VcsPlatform.GITLAB_SELF_HOSTED:
+        return VcsServiceFactory.createGitLabService(config);
 
       case VcsPlatform.LOCAL:
         throw new Error(
@@ -39,14 +44,11 @@ export class VcsServiceFactory {
             `VCS factory should not be used for local filesystem.`
         );
 
-      case VcsPlatform.GITLAB:
-      case VcsPlatform.GITLAB_SELF_HOSTED:
       case VcsPlatform.BITBUCKET:
-      case VcsPlatform.BITBUCKET_SERVER:
-      case VcsPlatform.GITHUB_ENTERPRISE:
+      case VcsPlatform.BITBUCKET_SELF_HOSTED:
         throw new Error(
           `Platform ${config.platform} is not yet supported. ` +
-            `Currently supported platforms: github`
+            `Currently supported platforms: github, github-self-hosted, gitlab, gitlab-self-hosted`
         );
 
       default:
@@ -54,13 +56,11 @@ export class VcsServiceFactory {
     }
   }
 
-  /**
-   * Create GitHub service instance
-   */
   private static createGitHubService(config: VcsServiceFactoryConfig): GitHubService {
     const githubConfig: GitHubServiceConfig = {
-      platform: VcsPlatform.GITHUB,
+      platform: config.platform, // Can be GITHUB or GITHUB_SELF_HOSTED
       token: config.githubToken || process.env.GITHUB_TOKEN || '',
+      host: config.githubHost,
       debug: config.debug,
       skipArchived: config.skipArchived,
       maxRetries: config.maxRetries,
@@ -75,16 +75,33 @@ export class VcsServiceFactory {
     return new GitHubService(githubConfig);
   }
 
-  /**
-   * Get list of supported VCS platforms (local filesystem is handled separately)
-   */
-  static getSupportedPlatforms(): VcsPlatform[] {
-    return [VcsPlatform.GITHUB];
+  private static createGitLabService(config: VcsServiceFactoryConfig): GitLabService {
+    const gitlabConfig: GitLabServiceConfig = {
+      platform: config.platform, // Can be GITLAB or GITLAB_SELF_HOSTED
+      token: config.gitlabToken || process.env.GITLAB_TOKEN || '',
+      host: config.gitlabHost,
+      debug: config.debug,
+      skipArchived: config.skipArchived,
+      maxRetries: config.maxRetries,
+      cacheEnabled: config.cacheEnabled,
+      useRateLimit: config.useRateLimit,
+      repoPattern: config.repoPattern,
+      iacFileTypes: config.iacFileTypes,
+      maxConcurrentRepos: config.maxConcurrentRepos,
+      maxConcurrentFiles: config.maxConcurrentFiles,
+    };
+
+    return new GitLabService(gitlabConfig);
   }
 
-  /**
-   * Check if a platform is supported by VCS factory
-   */
+  static getSupportedPlatforms(): VcsPlatform[] {
+    return [
+      VcsPlatform.GITHUB,
+      VcsPlatform.GITHUB_SELF_HOSTED,
+      VcsPlatform.GITLAB,
+      VcsPlatform.GITLAB_SELF_HOSTED,
+    ];
+  }
   static isPlatformSupported(platform: VcsPlatform): boolean {
     return VcsServiceFactory.getSupportedPlatforms().includes(platform);
   }
