@@ -96,9 +96,7 @@ export function createRepositoryCacheKey(
     parts.push(repo);
   }
   parts.push(...additionalParams);
-  
+
   // Sanitize cache key - remove invalid characters
-  return parts
-    .map(part => part.replace(/[^\w-]/g, '_'))
-    .join(':');
+  return parts.map(part => part.replace(/[^\w-]/g, '_')).join(':');
 }

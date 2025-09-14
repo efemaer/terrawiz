@@ -25,9 +25,7 @@ const logger = Logger.forComponent('Main');
  */
 program
   .name('terrawiz')
-  .description(
-    'Track Terraform modules across version control platforms and local filesystems'
-  )
+  .description('Track Terraform modules across version control platforms and local filesystems')
   .version('1.0.0');
 
 program
@@ -41,7 +39,7 @@ program
   // === Core Options (Legacy - Deprecated) ===
   .option(
     '-o, --org <organization>',
-'[DEPRECATED] Use source argument instead. Organization or user name'
+    '[DEPRECATED] Use source argument instead. Organization or user name'
   )
   .option(
     '-r, --repo <repository>',

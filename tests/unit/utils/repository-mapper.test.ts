@@ -1,9 +1,9 @@
-import { 
-  mapToVcsRepository, 
-  createGitHubRawRepository, 
+import {
+  mapToVcsRepository,
+  createGitHubRawRepository,
   createGitLabRawRepository,
   createRepositoryCacheKey,
-  RawRepository 
+  RawRepository,
 } from '../../../src/utils/repository-mapper';
 
 describe('Repository Mapper Utils', () => {
@@ -17,7 +17,7 @@ describe('Repository Mapper Utils', () => {
         private: true,
         url: 'https://github.com/owner/test-repo',
         cloneUrl: 'https://github.com/owner/test-repo.git',
-        owner: { login: 'owner' }
+        owner: { login: 'owner' },
       };
 
       const result = mapToVcsRepository(raw);
@@ -30,7 +30,7 @@ describe('Repository Mapper Utils', () => {
         archived: false,
         private: true,
         url: 'https://github.com/owner/test-repo',
-        cloneUrl: 'https://github.com/owner/test-repo.git'
+        cloneUrl: 'https://github.com/owner/test-repo.git',
       });
     });
 
@@ -43,7 +43,7 @@ describe('Repository Mapper Utils', () => {
         private: false,
         url: 'https://example.com/test-repo',
         cloneUrl: 'https://example.com/test-repo.git',
-        owner: { name: 'fallback-owner' }
+        owner: { name: 'fallback-owner' },
       };
 
       const result = mapToVcsRepository(raw);
@@ -61,7 +61,7 @@ describe('Repository Mapper Utils', () => {
         private: true,
         html_url: 'https://github.com/myorg/my-repo',
         clone_url: 'https://github.com/myorg/my-repo.git',
-        owner: { login: 'myorg' }
+        owner: { login: 'myorg' },
       };
 
       const result = createGitHubRawRepository(githubRepo);
@@ -74,7 +74,7 @@ describe('Repository Mapper Utils', () => {
         private: true,
         url: 'https://github.com/myorg/my-repo',
         cloneUrl: 'https://github.com/myorg/my-repo.git',
-        owner: { login: 'myorg' }
+        owner: { login: 'myorg' },
       });
     });
   });
@@ -90,7 +90,7 @@ describe('Repository Mapper Utils', () => {
         visibility: 'private' as const,
         web_url: 'https://gitlab.com/mygroup/my-project',
         http_url_to_repo: 'https://gitlab.com/mygroup/my-project.git',
-        namespace: { path: 'mygroup' }
+        namespace: { path: 'mygroup' },
       };
 
       const result = createGitLabRawRepository(gitlabProject);
@@ -103,7 +103,7 @@ describe('Repository Mapper Utils', () => {
         private: true,
         url: 'https://gitlab.com/mygroup/my-project',
         cloneUrl: 'https://gitlab.com/mygroup/my-project.git',
-        owner: { path: 'mygroup' }
+        owner: { path: 'mygroup' },
       });
     });
 
@@ -117,7 +117,7 @@ describe('Repository Mapper Utils', () => {
         visibility: 'public' as const,
         web_url: 'https://gitlab.com/mygroup/public-project',
         http_url_to_repo: 'https://gitlab.com/mygroup/public-project.git',
-        namespace: { path: 'mygroup' }
+        namespace: { path: 'mygroup' },
       };
 
       const result = createGitLabRawRepository(gitlabProject);
@@ -137,7 +137,14 @@ describe('Repository Mapper Utils', () => {
     });
 
     it('should handle additional parameters', () => {
-      const key = createRepositoryCacheKey('github', 'operation', 'owner', 'repo', 'param1', 'param2');
+      const key = createRepositoryCacheKey(
+        'github',
+        'operation',
+        'owner',
+        'repo',
+        'param1',
+        'param2'
+      );
       expect(key).toBe('github:operation:owner:repo:param1:param2');
     });
 

@@ -226,22 +226,22 @@ describe('LocalFilesystemScanner', () => {
       const sourceDir = path.join(tempDir, 'source');
       const nestedDir = path.join(sourceDir, 'nested');
       const symlinkDir = path.join(tempDir, 'symlink-dir');
-      
+
       fs.mkdirSync(sourceDir);
       fs.mkdirSync(nestedDir);
-      
+
       // Create IaC files in nested directory
       fs.writeFileSync(path.join(nestedDir, 'main.tf'), 'resource "test" {}');
-      
+
       // Create symlink to directory
       fs.symlinkSync(sourceDir, symlinkDir);
-      
+
       // Create circular symlink (infinite loop protection test)
       const circularLink = path.join(sourceDir, 'circular');
       fs.symlinkSync(sourceDir, circularLink);
-      
+
       const files = await scanner.scanDirectory(tempDir);
-      
+
       // Should find the terraform file, handling symlinks but avoiding infinite loops
       expect(files.length).toBeGreaterThan(0);
       expect(files.some(f => f.path.includes('main.tf'))).toBe(true);
@@ -251,7 +251,7 @@ describe('LocalFilesystemScanner', () => {
       // Create a terraform file
       const terraformFile = path.join(tempDir, 'main.tf');
       fs.writeFileSync(terraformFile, 'resource "test" {}');
-      
+
       // Mock fs.promises.readFile to throw an error for this specific file
       const originalReadFile = fs.promises.readFile;
       jest.spyOn(fs.promises, 'readFile').mockImplementation(async (filePath, encoding) => {
@@ -260,10 +260,10 @@ describe('LocalFilesystemScanner', () => {
         }
         return originalReadFile(filePath, encoding);
       });
-      
+
       try {
         const files = await scanner.scanDirectory(tempDir);
-        
+
         // Should handle the error gracefully and continue
         expect(Array.isArray(files)).toBe(true);
       } finally {
@@ -276,12 +276,12 @@ describe('LocalFilesystemScanner', () => {
       fs.writeFileSync(path.join(tempDir, 'main.tf'), 'resource "test" {}');
       fs.writeFileSync(path.join(tempDir, 'variables.tf'), 'variable "test" {}');
       fs.writeFileSync(path.join(tempDir, 'test.tf'), 'resource "test" {}');
-      
+
       const files = await scanner.scanDirectory(tempDir, {
         fileTypes: ['terraform'],
-        excludePatterns: [/test\.tf$/] // Exclude test.tf
+        excludePatterns: [/test\.tf$/], // Exclude test.tf
       });
-      
+
       expect(files).toHaveLength(2);
       expect(files.every(f => !f.path.includes('test.tf'))).toBe(true);
       expect(files.some(f => f.path.includes('main.tf'))).toBe(true);
@@ -293,12 +293,12 @@ describe('LocalFilesystemScanner', () => {
       fs.writeFileSync(path.join(tempDir, 'main.tf'), 'resource "test" {}');
       fs.writeFileSync(path.join(tempDir, 'variables.tf'), 'variable "test" {}');
       fs.writeFileSync(path.join(tempDir, 'terragrunt.hcl'), 'terraform {}');
-      
+
       const files = await scanner.scanDirectory(tempDir, {
         fileTypes: ['terraform', 'terragrunt'],
-        includePatterns: [/main\.tf$/, /terragrunt\.hcl$/] // Only include main.tf and terragrunt.hcl
+        includePatterns: [/main\.tf$/, /terragrunt\.hcl$/], // Only include main.tf and terragrunt.hcl
       });
-      
+
       expect(files).toHaveLength(2);
       expect(files.some(f => f.path.includes('main.tf'))).toBe(true);
       expect(files.some(f => f.path.includes('terragrunt.hcl'))).toBe(true);
@@ -307,12 +307,12 @@ describe('LocalFilesystemScanner', () => {
 
     it('should handle debug mode in constructor', async () => {
       const debugScanner = new LocalFilesystemScanner({ debug: true });
-      
+
       // Create a test file
       fs.writeFileSync(path.join(tempDir, 'main.tf'), 'resource "test" {}');
-      
+
       const files = await debugScanner.scanDirectory(tempDir);
-      
+
       expect(files).toHaveLength(1);
       expect(files[0].type).toBe('terraform');
     });
@@ -322,12 +322,12 @@ describe('LocalFilesystemScanner', () => {
       const hiddenDir = path.join(tempDir, '.hidden');
       fs.mkdirSync(hiddenDir);
       fs.writeFileSync(path.join(hiddenDir, 'main.tf'), 'resource "test" {}');
-      
+
       // Create normal file
       fs.writeFileSync(path.join(tempDir, 'main.tf'), 'resource "test" {}');
-      
+
       const files = await scanner.scanDirectory(tempDir);
-      
+
       // Should only find the file in the main directory, not in hidden directory
       expect(files).toHaveLength(1);
       expect(files[0].path).toBe('main.tf');
@@ -336,15 +336,17 @@ describe('LocalFilesystemScanner', () => {
     it('should handle EACCES error during directory validation', async () => {
       const testDir = path.join(tempDir, 'test-dir');
       fs.mkdirSync(testDir);
-      
+
       // Mock fs.promises.access to throw EACCES
       jest.spyOn(fs.promises, 'access').mockRejectedValue({
         code: 'EACCES',
-        message: 'Permission denied'
+        message: 'Permission denied',
       } as NodeJS.ErrnoException);
-      
+
       try {
-        await expect(scanner.scanDirectory(testDir)).rejects.toThrow('Permission denied reading directory');
+        await expect(scanner.scanDirectory(testDir)).rejects.toThrow(
+          'Permission denied reading directory'
+        );
       } finally {
         jest.restoreAllMocks();
       }
@@ -353,10 +355,10 @@ describe('LocalFilesystemScanner', () => {
     it('should handle unknown error during directory validation', async () => {
       const testDir = path.join(tempDir, 'test-dir');
       fs.mkdirSync(testDir);
-      
+
       // Mock fs.promises.access to throw unknown error
       jest.spyOn(fs.promises, 'access').mockRejectedValue(new Error('Unknown error'));
-      
+
       try {
         await expect(scanner.scanDirectory(testDir)).rejects.toThrow('Unable to access directory');
       } finally {

@@ -488,5 +488,4 @@ export class GitLabService extends BaseVcsService {
       return '';
     }
   }
-
 }

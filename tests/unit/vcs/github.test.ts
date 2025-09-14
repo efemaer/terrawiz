@@ -50,7 +50,7 @@ describe('GitHubService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env = { ...originalEnv };
-    
+
     // Mock rate limit response for all tests
     mockOctokit.rateLimit.get.mockResolvedValue({
       data: {

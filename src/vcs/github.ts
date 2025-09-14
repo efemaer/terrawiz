@@ -14,10 +14,10 @@ import {
 } from '../types';
 import { processConcurrentlySettled } from '../utils/concurrent';
 import { isNotFoundError } from '../utils/error-handler';
-import { 
-  mapToVcsRepository, 
-  createGitHubRawRepository, 
-  createRepositoryCacheKey 
+import {
+  mapToVcsRepository,
+  createGitHubRawRepository,
+  createRepositoryCacheKey,
 } from '../utils/repository-mapper';
 import { API_DEFAULTS } from '../constants';
 
@@ -352,7 +352,7 @@ export class GitHubService extends BaseVcsService {
         });
 
         // Map to our VcsRepository format using shared utility
-        const repoInfos: VcsRepository[] = filteredRepos.map((repo: GitHubRepo) => 
+        const repoInfos: VcsRepository[] = filteredRepos.map((repo: GitHubRepo) =>
           mapToVcsRepository(createGitHubRawRepository(repo))
         );
 
@@ -580,5 +580,4 @@ export class GitHubService extends BaseVcsService {
       return '';
     }
   }
-
 }

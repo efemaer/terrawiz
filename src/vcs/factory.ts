@@ -96,10 +96,10 @@ export class VcsServiceFactory {
 
   static getSupportedPlatforms(): VcsPlatform[] {
     return [
-      VcsPlatform.GITHUB, 
-      VcsPlatform.GITHUB_SELF_HOSTED, 
-      VcsPlatform.GITLAB, 
-      VcsPlatform.GITLAB_SELF_HOSTED
+      VcsPlatform.GITHUB,
+      VcsPlatform.GITHUB_SELF_HOSTED,
+      VcsPlatform.GITLAB,
+      VcsPlatform.GITLAB_SELF_HOSTED,
     ];
   }
   static isPlatformSupported(platform: VcsPlatform): boolean {

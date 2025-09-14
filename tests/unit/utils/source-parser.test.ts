@@ -275,7 +275,9 @@ describe('Source Parser', () => {
       expect(getPlatformDisplayName(VcsPlatform.GITLAB)).toBe('GitLab');
       expect(getPlatformDisplayName(VcsPlatform.GITLAB_SELF_HOSTED)).toBe('GitLab Self-Hosted');
       expect(getPlatformDisplayName(VcsPlatform.BITBUCKET)).toBe('Bitbucket');
-      expect(getPlatformDisplayName(VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe('Bitbucket Self-Hosted');
+      expect(getPlatformDisplayName(VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(
+        'Bitbucket Self-Hosted'
+      );
       expect(getPlatformDisplayName(VcsPlatform.LOCAL)).toBe('Local Filesystem');
     });
   });

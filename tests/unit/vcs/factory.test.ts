@@ -72,7 +72,7 @@ describe('VcsServiceFactory', () => {
       };
 
       expect(() => VcsServiceFactory.createService(config)).toThrow(
-'Platform bitbucket is not yet supported. Currently supported platforms: github, github-self-hosted, gitlab, gitlab-self-hosted'
+        'Platform bitbucket is not yet supported. Currently supported platforms: github, github-self-hosted, gitlab, gitlab-self-hosted'
       );
     });
 
