@@ -1,304 +1,198 @@
 # Terrawiz
 
-> **Discover and analyze Terraform modules across GitHub, GitLab, and local filesystems**
+Discover and analyze Terraform and Terragrunt modules across GitHub, GitLab, and local filesystems. Terrawiz gives you clear visibility into IaC usage: inventory modules, track versions, and export reports.
 
 [![npm version](https://img.shields.io/npm/v/terrawiz.svg)](https://www.npmjs.com/package/terrawiz)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Get complete visibility into your Infrastructure as Code. Scan organizations, export reports, and track module usage across your infrastructure.
+## Key Features
+- Discover Terraform (.tf) and Terragrunt (.hcl) modules across repositories
+- Summarize usage by module source and version constraints
+- Export results as table, JSON, or CSV
+- Filter repositories by name (regex)
+- Parallel scanning with adjustable concurrency
+- Rate‑limit aware for GitHub/GitLab APIs
 
+## Quick Start (GitHub)
+
+1) Install the CLI
 ```bash
-# Scan GitHub organization
-npx terrawiz scan github:your-org
-
-# Self-hosted instances
-npx terrawiz scan github://github.company.com/your-org
+npm install -g terrawiz
 ```
 
-## Why Terrawiz?
+2) Set a GitHub token
+```bash
+# https://github.com/settings/tokens
+export GITHUB_TOKEN=your_token
+```
 
-**Common Infrastructure Challenges:**
-- "Which repositories use the VPC module?"
-- "What version of terraform-aws-eks are we running?"
-- "Do we have any deprecated modules?"
-- Manual searching across repositories takes hours
+3) Run your first scan
+```bash
+# Scan a GitHub organization
+terrawiz scan github:your-org
 
-**Terrawiz Solutions:**
-- Complete module inventory across platforms
-- Version tracking across all repositories  
-- Export reports for compliance and audits
-- Identify security risks and technical debt
+# Or scan a single repository
+terrawiz scan github:your-org/your-repo
+```
+
+4) Export results (optional)
+```bash
+# JSON report
+terrawiz scan github:your-org -f json -e audit.json
+
+# CSV report
+terrawiz scan github:your-org -f csv -e modules.csv
+```
 
 ## Example Output
 
-```bash
-terrawiz scan github:hashicorp
-```
+The examples below are captured from running the command against the repository `github:hashicorp/terraform-guides`.
 
+Table (human‑readable):
+```bash
+terrawiz scan github:hashicorp/terraform-guides
+```
 ```
 Infrastructure as Code Module Usage Report
 ============================
 Platform: GitHub
-Target: hashicorp
-Total modules found: 47 (38 Terraform, 9 Terragrunt)
-Total files analyzed: 156
+Target: hashicorp/terraform-guides
+Scope: Single repository: terraform-guides
+Total modules found: 28 (28 Terraform, 0 Terragrunt)
+Total files analyzed: 135 (124 Terraform, 11 Terragrunt)
 
 Module Summary by Source:
 
-terraform-aws-modules/vpc/aws (12 instances, type: registry)
+Azure/compute/azurerm (1 instances, type: registry)
   Versions:
-    - ~> 5.0: 8 instances
-    - ~> 4.0: 4 instances
+    - 1.1.5: 1 instances
 
-./modules/networking (8 instances, type: local)
+./modules/openshift (1 instances, type: local)
 
-terraform-aws-modules/eks/aws (6 instances, type: registry)
-  Versions:
-    - ~> 19.0: 6 instances
+git::ssh://git@github.com/hashicorp-modules/hashistack-gcp (1 instances, type: git)
 
-git::github.com/company/modules.git//s3?ref=v2.0 (3 instances, type: git)
+... (additional sources omitted for brevity)
 ```
 
-**Use Cases:**
-- **DevOps Teams** - Audit infrastructure dependencies
-- **Security Teams** - Identify vulnerable module versions  
-- **Compliance** - Generate module inventory reports
-- **Platform Teams** - Track module adoption across organizations
-
-## Quick Start
-
-### 1. Run without installation
-```bash
-# Scan GitHub organization
-npx terrawiz scan github:your-org
-
-# Export to CSV
-npx terrawiz scan github:your-org -f csv -e modules.csv
-```
-
-### 2. Setup authentication tokens
-```bash
-# GitHub token: https://github.com/settings/tokens
-export GITHUB_TOKEN=your_token
-
-# GitLab token: https://gitlab.com/-/profile/personal_access_tokens
-export GITLAB_TOKEN=your_token
-```
-
-### 3. Scan platforms
-```bash
-# Public platforms
-terrawiz scan github:your-org
-terrawiz scan gitlab:your-group
-
-# Self-hosted instances  
-terrawiz scan github://github.company.com/your-org
-terrawiz scan gitlab://gitlab.company.com/your-group
-
-# Local directories
-terrawiz scan local:/path/to/terraform
-
-# Export results
-terrawiz scan github:your-org -f json -e audit-report.json
-```
-
-## Output Formats
-
-### Table (Human-readable)
-```
-Module Summary by Source:
-terraform-aws-modules/vpc/aws (5 instances)
-  - ~> 5.0: 3 instances  
-  - ~> 4.0: 2 instances
-./modules/networking (4 instances)
-```
-
-### JSON (API-friendly)
+JSON (API‑friendly):
 ```json
 {
   "metadata": {
     "platform": "GitHub",
-    "moduleCount": 14,
-    "timestamp": "2024-06-29T14:23:15.456Z"
+    "moduleCount": 28,
+    "timestamp": "2025-09-14T16:06:48.575Z"
   },
   "modules": [
     {
-      "source": "terraform-aws-modules/vpc/aws",
-      "version": "~> 5.0",
-      "repository": "infrastructure-core",
-      "filePath": "networking/vpc.tf",
-      "lineNumber": 12
+      "source": "Azure/compute/azurerm",
+      "sourceType": "registry",
+      "version": "1.1.5",
+      "repository": "hashicorp/terraform-guides",
+      "filePath": "infrastructure-as-code/azure-vm/main.tf",
+      "lineNumber": 19
     }
   ]
 }
 ```
 
-### CSV (Spreadsheet-ready)
+CSV (spreadsheet‑ready):
 ```csv
-module,source_type,version,repository,file_path,line
-terraform-aws-modules/vpc/aws,registry,~> 5.0,infra-core,main.tf,12
+module,source_type,file_type,version,repository,file_path,line_number,file_link
+Azure/compute/azurerm,registry,terraform,1.1.5,hashicorp/terraform-guides,infrastructure-as-code/azure-vm/main.tf,19,https://github.com/hashicorp/terraform-guides/blob/master/infrastructure-as-code/azure-vm/main.tf#L19
+./modules/openshift,local,terraform,,hashicorp/terraform-guides,infrastructure-as-code/k8s-cluster-openshift-aws/main.tf,42,https://github.com/hashicorp/terraform-guides/blob/master/infrastructure-as-code/k8s-cluster-openshift-aws/main.tf#L42
+git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashicorp/terraform-guides,infrastructure-as-code/hashistack/dev/terraform-gcp/main.tf,22,https://github.com/hashicorp/terraform-guides/blob/master/infrastructure-as-code/hashistack/dev/terraform-gcp/main.tf#L22
 ```
 
-## Module Detection
+## Authentication
 
-Terrawiz identifies these module source types:
-- **Registry modules**: `terraform-aws-modules/vpc/aws`
-- **Git sources**: `git::github.com/company/modules.git//vpc`
-- **Local modules**: `./modules/networking`, `../shared/database`
-- **Private registries**: `registry.company.com/team/vpc`
+- GitHub
+  - Env var: `GITHUB_TOKEN` (required)
+  - Scope: public repos work with a basic token; for private repos and org scans, grant `repo` (private) and `read:org` as needed.
+  - GitHub Enterprise uses the same `GITHUB_TOKEN`; include the host in the source (e.g., `github://github.company.com/org`).
 
-## Performance Features
+- GitLab
+  - Env var: `GITLAB_TOKEN` (required)
+  - Scope: `read_api` (or `api`) for private projects; sufficient rights to list projects and read files.
+  - Self‑hosted GitLab uses the same `GITLAB_TOKEN`; include the host in the source (e.g., `gitlab://gitlab.company.com/group`).
 
-- Parallel processing across repositories
-- Concurrent file scanning within repositories
-- Built-in rate limiting respects API limits
-- Smart caching avoids redundant requests
+- Local
+  - No authentication required for `local:` sources.
+
+## CLI Reference
+
+- Command structure
+  - `terrawiz scan <source> [options]`
+  - `terrawiz help [command]`
+
+- Commands
+  - `scan` — Scan and analyze IaC modules from a target
+  - `help` — Show help for the CLI or a command
+
+- Positional arguments
+  - `source` — what to scan. Supported forms:
+    - GitHub (cloud): `github:org` or `github:org/repo`
+    - GitHub Enterprise: `github://host/org` or `github://host/org/repo`
+    - GitLab (cloud): `gitlab:group` or `gitlab:group/project`
+    - GitLab Self‑Hosted: `gitlab://host/group` or `gitlab://host/group/project`
+    - Local filesystem: `local:.`, `local:/abs/path`, `local:./relative/path`
+    - Note: Bitbucket is not supported yet.
+
+- Options
+  - `-f, --format <format>` — Output format: `table` (default), `json`, `csv`
+  - `-e, --export <file>` — Write results to a file
+  - `-c, --concurrency <repos:files>` — Concurrency (e.g., `5:10`)
+  - `--limit <number>` — Limit repositories to scan
+  - `--include-archived` — Include archived repositories (default is skip)
+  - `-p, --pattern <regex>` — Filter repositories by name pattern
+  - `--terraform-only` — Scan only Terraform (.tf) files
+  - `--terragrunt-only` — Scan only Terragrunt (.hcl) files
+  - `--disable-rate-limit` — Disable API rate limiting
+  - `--debug` — Enable verbose debug logging
+  - [Deprecated] `--org`, `--repo` — Legacy flags (use the `source` argument instead)
 
 ## Advanced Usage
 
-### Performance Tuning
-```bash
-# High-speed scanning (15 repos, 25 files concurrently)
-terrawiz scan github:large-org -c 15:25
+- Filtering & scope
+  - Focus on certain repos: `-p "^terraform-"`
+  - Restrict file types: `--terraform-only` or `--terragrunt-only`
+  - Include archived repos: `--include-archived`
+  - Limit breadth for quick checks: `--limit 10`
 
-# Conservative (rate-limited tokens)
-terrawiz scan github:your-org -c 2:5
-```
+- Performance & rate limits
+  - Tune concurrency: `-c 10:20` (repos:files)
+  - Respect API limits by default; to disable: `--disable-rate-limit`
+  - Use `--debug` to see detailed progress and timings
 
-### Filtering Options
-```bash
-# Only Terraform files
-terrawiz scan github:your-org --terraform-only
+- Enterprise/self‑hosted targets
+  - GitHub Enterprise: `github://github.company.com/org`
+  - GitLab self‑hosted: `gitlab://gitlab.company.com/group`
 
-# Pattern matching
-terrawiz scan github:your-org -p "^terraform-"
+- Local scanning
+  - Scan current project: `terrawiz scan local:.`
+  - Scan absolute path: `terrawiz scan local:/path/to/terraform`
 
-# Include archived repos
-terrawiz scan github:your-org --include-archived
+- CI/CD & Docker
+  - Docker (GitHub example):
+    ```bash
+    docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN \
+      ghcr.io/efemaer/terrawiz:latest scan github:your-org -f json
+    ```
 
-# Limit scope
-terrawiz scan github:your-org --limit 10
-```
-
-### Enterprise & Self-Hosted
-```bash
-# GitHub Enterprise
-terrawiz scan github://github.company.com/devops
-
-# GitLab self-hosted with custom port
-terrawiz scan gitlab://gitlab.company.com:8080/platform-team
-
-# Multiple platform audit
-terrawiz scan github:public-org -e github-audit.csv
-terrawiz scan gitlab://internal.com/team -e gitlab-audit.csv
-```
-
-### Local Development
-```bash
-# Scan current project
-terrawiz scan local:.
-
-# Scan with absolute path
-terrawiz scan local:/home/user/terraform-projects
-
-# Export local results
-terrawiz scan local:./infrastructure -f json -e local-modules.json
-```
-
-### CI/CD Integration
-```bash
-# Docker usage
-docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN \
-  ghcr.io/efemaer/terrawiz:latest scan github:your-org -f json
-
-# GitHub Actions / GitLab CI
-terrawiz scan github:${{ github.repository_owner }} --terraform-only
-```
-
-## Installation Options
-
-### NPM (Recommended)
-```bash
-npm install -g terrawiz
-terrawiz scan github:your-org
-```
-
-### NPX (No Installation)
-```bash
-npx terrawiz scan github:your-org
-```
-
-### Docker (CI/CD)
-```bash
-docker pull ghcr.io/efemaer/terrawiz:latest
-docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN \
-  ghcr.io/efemaer/terrawiz:latest scan github:your-org
-```
-
-## Use Cases
-
-### Security Audits
-```bash
-# Find all module versions for vulnerability scanning
-terrawiz scan github:your-org -f csv -e security-audit.csv
-```
-
-### Compliance Reporting
-```bash
-# Generate compliance reports
-terrawiz scan github:your-org -f json -e compliance-$(date +%Y%m%d).json
-```
-
-### Migration Planning
-```bash
-# Identify modules to upgrade
-terrawiz scan github:your-org --terraform-only -p "legacy-"
-```
-
-### Architecture Analysis
-```bash
-# Cross-platform module usage analysis  
-terrawiz scan github:public-repos -e github-modules.csv
-terrawiz scan gitlab://internal.com/team -e internal-modules.csv
-```
-
-## Tips
-
-### Performance
-- Use `--limit` for quick checks: `terrawiz scan github:large-org --limit 5`
-- Tune concurrency for your API limits: `-c 10:20` for fast, `-c 2:5` for conservative
-- Export large results to files instead of console output
-
-### Filtering
-- Use regex patterns to focus: `-p "^terraform-aws-"` for AWS modules only
-- Combine with file type filters: `--terraform-only -p "vpc"`
-- Skip archived repos to focus on active code: default behavior
-
-### Reporting
-- JSON format for programmatic analysis
-- CSV format for spreadsheets and data analysis  
-- Table format for human review and terminal output
+- No‑install option
+  - Prefer not to install globally? Run once with: `npx terrawiz scan github:your-org`
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development setup, architecture overview, and contribution guidelines.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 Quick start:
 1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`  
-3. Test your changes: `npm test && npm run lint`
-4. Submit pull request
-
-### Development Setup
-```bash
-git clone https://github.com/efemaer/terrawiz.git
-cd terrawiz
-npm install
-npm test
-```
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Run checks: `npm test && npm run lint && npm run format:check`
+4. Open a pull request
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
