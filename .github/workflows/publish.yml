@@ -14,6 +14,9 @@ jobs:
   publish:
     name: Publish to NPM and GitHub Container Registry
     runs-on: ubuntu-latest
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
       id-token: write
@@ -27,17 +30,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
-          cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run quality checks
         run: npm run quality
 
       - name: Build project
         run: npm run build
+
+      - name: Validate release tag matches package.json version
+        if: github.event_name == 'release'
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "v$PKG_VERSION" ]; then
+            echo "Error: Release tag ($TAG) does not match package.json version (v$PKG_VERSION)"
+            exit 1
+          fi
 
       - name: Update version (if specified)
         if: github.event.inputs.version != ''
