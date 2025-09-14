@@ -21,7 +21,7 @@ import {
 } from '../utils/repository-mapper';
 import { API_DEFAULTS } from '../constants';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 interface GitHubRepo {
   name: string;

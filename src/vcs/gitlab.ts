@@ -15,7 +15,7 @@ import { isNotFoundError } from '../utils/error-handler';
 import { createRepositoryCacheKey } from '../utils/repository-mapper';
 import { API_DEFAULTS } from '../constants';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 interface GitLabProject {
   id: number;

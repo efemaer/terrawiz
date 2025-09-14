@@ -17,7 +17,7 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { DEFAULT_REPO_CONCURRENCY, DEFAULT_FILE_CONCURRENCY } from './constants';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 const logger = Logger.forComponent('Main');
 
 /**
