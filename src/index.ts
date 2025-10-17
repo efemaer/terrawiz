@@ -12,6 +12,8 @@ import {
   getPlatformDisplayName,
   ParsedSource,
 } from './utils/source-parser';
+import { sortModulesBySource } from './utils/sort-modules';
+import { createNormalizedSummary } from './utils/normalize-source';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
@@ -271,7 +273,7 @@ program
       const terragruntFileCount = files.filter(f => f.type === 'terragrunt').length;
       logger.info(
         `Found ${files.length} IaC files: ${terraformFileCount} Terraform, ` +
-          `${terragruntFileCount} Terragrunt. Analyzing module usage...`
+        `${terragruntFileCount} Terragrunt. Analyzing module usage...`
       );
 
       // Initialize parsers for module analysis
@@ -294,7 +296,7 @@ program
 
       logger.info(
         `Found ${terraformModules.length + terragruntModules.length} module references ` +
-          `(${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
+        `(${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
       );
 
       // Create summaries
@@ -304,7 +306,10 @@ program
         terragruntModules.length > 0 ? terragruntParser.createModuleSummary(terragruntModules) : {};
 
       // Combine modules for output
-      const allModules: IaCModule[] = [...terraformModules, ...terragruntModules];
+      let allModules: IaCModule[] = [...terraformModules, ...terragruntModules];
+
+      // Sort modules by source to group same sources together
+      allModules = sortModulesBySource(allModules);
 
       // Combine summaries
       const combinedSummary = {
@@ -373,33 +378,32 @@ program
             `Target: ${result.metadata.target}`,
             `Scope: ${result.metadata.scope}`,
             options.pattern ? `Repository filter: ${options.pattern}` : '',
-            `Total modules found: ${allModules.length}${
-              !options.terraformOnly && !options.terragruntOnly
-                ? ` (${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
-                : ''
+            `Total modules found: ${allModules.length}${!options.terraformOnly && !options.terragruntOnly
+              ? ` (${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
+              : ''
             }`,
-            `Total files analyzed: ${files.length}${
-              !options.terraformOnly && !options.terragruntOnly
-                ? ` (${terraformFileCount} Terraform, ${terragruntFileCount} Terragrunt)`
-                : ''
+            `Total files analyzed: ${files.length}${!options.terraformOnly && !options.terragruntOnly
+              ? ` (${terraformFileCount} Terraform, ${terragruntFileCount} Terragrunt)`
+              : ''
             }`,
             '\nModule Summary by Source:',
           ].filter(Boolean);
 
-          // Sort by frequency
-          const sortedSources = Object.entries(combinedSummary).sort(
-            ([, a], [, b]) => b.count - a.count
+          // Create normalized summary to group same modules with different versions
+          const normalizedSummary = createNormalizedSummary(allModules);
+
+          // Sort by source name to group same sources together
+          const sortedSources = Object.entries(normalizedSummary).sort(
+            ([sourceA], [sourceB]) => sourceA.localeCompare(sourceB)
           );
 
           for (const [source, info] of sortedSources) {
-            // Find the source type by looking at the first module with this source
-            const sourceType = allModules.find(m => m.source === source)?.sourceType || 'unknown';
-            tableLines.push(`\n${source} (${info.count} instances, type: ${sourceType})`);
+            tableLines.push(`\n${source} (${info.count} instances, type: ${info.sourceType})`);
 
             if (Object.keys(info.versions).length > 0) {
               tableLines.push('  Versions:');
               Object.entries(info.versions)
-                .sort(([, a], [, b]) => b - a)
+                .sort(([versionA], [versionB]) => versionA.localeCompare(versionB))
                 .forEach(([version, count]) => {
                   tableLines.push(`    - ${version}: ${count} instances`);
                 });
