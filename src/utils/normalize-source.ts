@@ -37,7 +37,10 @@ export function normalizeModuleSource(source: string): string {
 export function createNormalizedSummary(
   modules: IaCModule[]
 ): Record<string, { count: number; versions: Record<string, number>; sourceType: string }> {
-  const summary: Record<string, { count: number; versions: Record<string, number>; sourceType: string }> = {};
+  const summary: Record<
+    string,
+    { count: number; versions: Record<string, number>; sourceType: string }
+  > = {};
 
   for (const module of modules) {
     const normalizedSource = normalizeModuleSource(module.source);

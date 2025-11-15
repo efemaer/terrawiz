@@ -120,12 +120,12 @@ describe('sortModulesBySource', () => {
 
       // All 3 vpc modules should be grouped together consecutively
       expect(vpcConsecutiveCount).toBe(3);
-      
+
       // Verify all vpc modules are together at the start (security-group comes alphabetically first)
       for (let i = 0; i < 3; i++) {
         expect(sorted[vpcSectionStart + i].source).toBe('terraform-aws-modules/vpc/aws');
       }
-      
+
       // Verify security-group comes before vpc (alphabetical order)
       const securityGroupSource = 'terraform-aws-modules/security-group/aws';
       const firstVpcIndex = sorted.findIndex(m => m.source === 'terraform-aws-modules/vpc/aws');

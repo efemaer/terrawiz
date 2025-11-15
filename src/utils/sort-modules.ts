@@ -42,4 +42,3 @@ export function sortModulesBySource(modules: IaCModule[]): IaCModule[] {
     return a.lineNumber - b.lineNumber;
   });
 }
-

@@ -2,7 +2,10 @@
  * Unit tests for normalize-source utility functions
  */
 
-import { normalizeModuleSource, createNormalizedSummary } from '../../../src/utils/normalize-source';
+import {
+  normalizeModuleSource,
+  createNormalizedSummary,
+} from '../../../src/utils/normalize-source';
 import { IaCModule } from '../../../src/parsers';
 
 describe('normalizeModuleSource', () => {
@@ -46,21 +49,28 @@ describe('normalizeModuleSource', () => {
 
   describe('real-world examples', () => {
     it('should normalize Azure DevOps git source with ref', () => {
-      const source = 'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-compute-instance-VMware?ref=v2.0';
+      const source =
+        'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-compute-instance-VMware?ref=v2.0';
       const normalized = normalizeModuleSource(source);
 
-      expect(normalized).toBe('git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-compute-instance-VMware');
+      expect(normalized).toBe(
+        'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-compute-instance-VMware'
+      );
     });
 
     it('should handle multiple different refs consistently', () => {
-      const source1 = 'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-subnet-nsxt?ref=v1.0';
-      const source2 = 'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-subnet-nsxt?ref=v2.0';
+      const source1 =
+        'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-subnet-nsxt?ref=v1.0';
+      const source2 =
+        'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-subnet-nsxt?ref=v2.0';
 
       const normalized1 = normalizeModuleSource(source1);
       const normalized2 = normalizeModuleSource(source2);
 
       expect(normalized1).toBe(normalized2);
-      expect(normalized1).toBe('git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-subnet-nsxt');
+      expect(normalized1).toBe(
+        'git::git@ssh.dev.azure.com:v3/itsc-germany/Merlin/terraform-module-subnet-nsxt'
+      );
     });
   });
 });

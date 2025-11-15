@@ -273,7 +273,7 @@ program
       const terragruntFileCount = files.filter(f => f.type === 'terragrunt').length;
       logger.info(
         `Found ${files.length} IaC files: ${terraformFileCount} Terraform, ` +
-        `${terragruntFileCount} Terragrunt. Analyzing module usage...`
+          `${terragruntFileCount} Terragrunt. Analyzing module usage...`
       );
 
       // Initialize parsers for module analysis
@@ -296,7 +296,7 @@ program
 
       logger.info(
         `Found ${terraformModules.length + terragruntModules.length} module references ` +
-        `(${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
+          `(${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
       );
 
       // Create summaries
@@ -378,13 +378,15 @@ program
             `Target: ${result.metadata.target}`,
             `Scope: ${result.metadata.scope}`,
             options.pattern ? `Repository filter: ${options.pattern}` : '',
-            `Total modules found: ${allModules.length}${!options.terraformOnly && !options.terragruntOnly
-              ? ` (${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
-              : ''
+            `Total modules found: ${allModules.length}${
+              !options.terraformOnly && !options.terragruntOnly
+                ? ` (${terraformModules.length} Terraform, ${terragruntModules.length} Terragrunt)`
+                : ''
             }`,
-            `Total files analyzed: ${files.length}${!options.terraformOnly && !options.terragruntOnly
-              ? ` (${terraformFileCount} Terraform, ${terragruntFileCount} Terragrunt)`
-              : ''
+            `Total files analyzed: ${files.length}${
+              !options.terraformOnly && !options.terragruntOnly
+                ? ` (${terraformFileCount} Terraform, ${terragruntFileCount} Terragrunt)`
+                : ''
             }`,
             '\nModule Summary by Source:',
           ].filter(Boolean);
@@ -393,8 +395,8 @@ program
           const normalizedSummary = createNormalizedSummary(allModules);
 
           // Sort by source name to group same sources together
-          const sortedSources = Object.entries(normalizedSummary).sort(
-            ([sourceA], [sourceB]) => sourceA.localeCompare(sourceB)
+          const sortedSources = Object.entries(normalizedSummary).sort(([sourceA], [sourceB]) =>
+            sourceA.localeCompare(sourceB)
           );
 
           for (const [source, info] of sortedSources) {
