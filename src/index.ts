@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { DEFAULT_REPO_CONCURRENCY, DEFAULT_FILE_CONCURRENCY } from './constants';
+import packageJson from '../package.json';
 
 dotenv.config({ quiet: true });
 const logger = Logger.forComponent('Main');
@@ -28,7 +29,7 @@ const logger = Logger.forComponent('Main');
 program
   .name('terrawiz')
   .description('Track Terraform modules across version control platforms and local filesystems')
-  .version('1.0.0');
+  .version(packageJson.version);
 
 program
   .command('scan')
