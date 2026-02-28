@@ -105,7 +105,7 @@ export class VcsServiceFactory {
     const azureConfig: AzureDevOpsServiceConfig = {
       platform: config.platform, // Can be AZURE_DEVOPS or AZURE_DEVOPS_SELF_HOSTED
       token: config.azureDevopsToken || process.env.AZURE_DEVOPS_TOKEN || '',
-      host: config.azureDevopsHost,
+      host: config.azureDevopsHost || process.env.AZURE_DEVOPS_HOST,
       debug: config.debug,
       skipArchived: config.skipArchived,
       maxRetries: config.maxRetries,

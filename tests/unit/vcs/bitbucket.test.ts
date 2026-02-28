@@ -1,31 +1,10 @@
 import { BitbucketService, BitbucketServiceConfig } from '../../../src/vcs/bitbucket';
 import { VcsPlatform } from '../../../src/types';
+import { createMockResponse } from '../../utils/mocks';
 
 const originalEnv = process.env;
 const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-
-function createMockResponse(
-  data: unknown,
-  status = 200,
-  headers: Record<string, string> = {}
-): Response {
-  const loweredHeaders = Object.fromEntries(
-    Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value])
-  );
-
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: {
-      get: (name: string) => loweredHeaders[name.toLowerCase()] || null,
-    },
-    json: jest.fn().mockResolvedValue(data),
-    text: jest
-      .fn()
-      .mockResolvedValue(typeof data === 'string' ? data : JSON.stringify(data, null, 2)),
-  } as unknown as Response;
-}
 
 describe('BitbucketService', () => {
   beforeEach(() => {
@@ -35,7 +14,7 @@ describe('BitbucketService', () => {
       mockFetch as unknown as typeof fetch;
   });
 
-  afterAll(() => {
+  afterEach(() => {
     process.env = originalEnv;
     (global as typeof global & { fetch: typeof fetch }).fetch = originalFetch;
   });
@@ -77,6 +56,17 @@ describe('BitbucketService', () => {
       expect(() => new BitbucketService(createDefaultConfig({ token: '' }))).toThrow(
         'Bitbucket token not found. Please provide token in config or set BITBUCKET_TOKEN environment variable'
       );
+    });
+
+    it('should throw error for unsafe repository pattern', () => {
+      expect(
+        () =>
+          new BitbucketService(
+            createDefaultConfig({
+              repoPattern: '(a+)+$',
+            })
+          )
+      ).toThrow('Unsafe repository regex pattern');
     });
 
     it('should initialize Bitbucket self-hosted service with host', () => {

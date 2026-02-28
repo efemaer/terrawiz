@@ -1,31 +1,10 @@
 import { AzureDevOpsService, AzureDevOpsServiceConfig } from '../../../src/vcs/azure-devops';
 import { VcsPlatform } from '../../../src/types';
+import { createMockResponse } from '../../utils/mocks';
 
 const originalEnv = process.env;
 const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-
-function createMockResponse(
-  data: unknown,
-  status = 200,
-  headers: Record<string, string> = {}
-): Response {
-  const loweredHeaders = Object.fromEntries(
-    Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value])
-  );
-
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: {
-      get: (name: string) => loweredHeaders[name.toLowerCase()] || null,
-    },
-    json: jest.fn().mockResolvedValue(data),
-    text: jest
-      .fn()
-      .mockResolvedValue(typeof data === 'string' ? data : JSON.stringify(data, null, 2)),
-  } as unknown as Response;
-}
 
 describe('AzureDevOpsService', () => {
   beforeEach(() => {
@@ -78,40 +57,67 @@ describe('AzureDevOpsService', () => {
         'Azure DevOps token not found. Please provide token in config or set AZURE_DEVOPS_TOKEN environment variable'
       );
     });
+
+    it('should throw error for unsafe repository pattern', () => {
+      expect(
+        () =>
+          new AzureDevOpsService(
+            createDefaultConfig({
+              repoPattern: '(a+)+$',
+            })
+          )
+      ).toThrow('Unsafe repository regex pattern');
+    });
   });
 
   describe('repositoryExists', () => {
     it('should return true for existing repository', async () => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          count: 1,
-          value: [
-            {
-              id: 'repo-id',
-              name: 'myrepo',
-              project: { name: 'myproject' },
-              defaultBranch: 'refs/heads/main',
-              webUrl: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
-              remoteUrl: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
-            },
-          ],
-        })
-      );
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            id: 'project-id',
+            name: 'myproject',
+            visibility: 'public',
+          })
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            count: 1,
+            value: [
+              {
+                id: 'repo-id',
+                name: 'myrepo',
+                project: { name: 'myproject' },
+                defaultBranch: 'refs/heads/main',
+                webUrl: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
+                remoteUrl: 'https://dev.azure.com/myorg/myproject/_git/myrepo',
+              },
+            ],
+          })
+        );
 
       const service = new AzureDevOpsService(createDefaultConfig());
       const result = await service.repositoryExists('myorg/myproject', 'myrepo');
 
       expect(result).toBe(true);
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it('should return false for non-existent repository', async () => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          count: 0,
-          value: [],
-        })
-      );
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            id: 'project-id',
+            name: 'myproject',
+            visibility: 'private',
+          })
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            count: 0,
+            value: [],
+          })
+        );
 
       const service = new AzureDevOpsService(createDefaultConfig());
       const result = await service.repositoryExists('myorg/myproject', 'missing-repo');
@@ -122,29 +128,37 @@ describe('AzureDevOpsService', () => {
 
   describe('getRepositories', () => {
     it('should return repositories for a project scope', async () => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          count: 2,
-          value: [
-            {
-              id: 'repo1-id',
-              name: 'repo1',
-              project: { name: 'myproject' },
-              defaultBranch: 'refs/heads/main',
-              webUrl: 'https://dev.azure.com/myorg/myproject/_git/repo1',
-              remoteUrl: 'https://dev.azure.com/myorg/myproject/_git/repo1',
-            },
-            {
-              id: 'repo2-id',
-              name: 'repo2',
-              project: { name: 'myproject' },
-              defaultBranch: 'refs/heads/main',
-              webUrl: 'https://dev.azure.com/myorg/myproject/_git/repo2',
-              remoteUrl: 'https://dev.azure.com/myorg/myproject/_git/repo2',
-            },
-          ],
-        })
-      );
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            id: 'project-id',
+            name: 'myproject',
+            visibility: 'public',
+          })
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            count: 2,
+            value: [
+              {
+                id: 'repo1-id',
+                name: 'repo1',
+                project: { name: 'myproject' },
+                defaultBranch: 'refs/heads/main',
+                webUrl: 'https://dev.azure.com/myorg/myproject/_git/repo1',
+                remoteUrl: 'https://dev.azure.com/myorg/myproject/_git/repo1',
+              },
+              {
+                id: 'repo2-id',
+                name: 'repo2',
+                project: { name: 'myproject' },
+                defaultBranch: 'refs/heads/main',
+                webUrl: 'https://dev.azure.com/myorg/myproject/_git/repo2',
+                remoteUrl: 'https://dev.azure.com/myorg/myproject/_git/repo2',
+              },
+            ],
+          })
+        );
 
       const service = new AzureDevOpsService(createDefaultConfig());
       const result = await service.getRepositories('myorg/myproject');
@@ -152,6 +166,7 @@ describe('AzureDevOpsService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].fullName).toBe('myorg/myproject/repo1');
       expect(result[1].fullName).toBe('myorg/myproject/repo2');
+      expect(result[0].private).toBe(false);
     });
   });
 

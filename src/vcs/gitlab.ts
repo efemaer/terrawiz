@@ -13,6 +13,7 @@ import {
 import { processConcurrentlySettled } from '../utils/concurrent';
 import { isNotFoundError } from '../utils/error-handler';
 import { createRepositoryCacheKey } from '../utils/repository-mapper';
+import { isSafeRegexPattern } from '../utils/regex-safety';
 import { API_DEFAULTS } from '../constants';
 
 dotenv.config({ quiet: true });
@@ -101,9 +102,33 @@ export class GitLabService extends BaseVcsService {
     // Initialize repository pattern filter if provided
     if (config.repoPattern) {
       try {
+        if (!isSafeRegexPattern(config.repoPattern)) {
+          try {
+            new RegExp(config.repoPattern);
+          } catch (error) {
+            throw new VcsError(
+              `Invalid repository regex pattern: ${config.repoPattern}`,
+              VcsErrorType.INVALID_CONFIGURATION,
+              config.platform,
+              undefined,
+              error instanceof Error ? error : undefined
+            );
+          }
+
+          throw new VcsError(
+            `Unsafe repository regex pattern: ${config.repoPattern}`,
+            VcsErrorType.INVALID_CONFIGURATION,
+            config.platform
+          );
+        }
+
         this.repoPattern = new RegExp(config.repoPattern);
         this.logger.info(`Repository filter pattern initialized: ${config.repoPattern}`);
       } catch (error) {
+        if (error instanceof VcsError) {
+          throw error;
+        }
+
         throw new VcsError(
           `Invalid repository regex pattern: ${config.repoPattern}`,
           VcsErrorType.INVALID_CONFIGURATION,

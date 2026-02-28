@@ -228,9 +228,9 @@ function parseAzurePathParts(
   }
 
   const project = parts[1];
-  if (!/^[a-zA-Z0-9._-]+$/.test(project)) {
+  if (!isValidAzureProjectName(project)) {
     throw new Error(
-      `Invalid ${platform} project: "${project}". Must contain only alphanumeric characters, dots, hyphens, and underscores.`
+      `Invalid ${platform} project: "${project}". Project names must be 1-64 characters, cannot start with "_" or start/end with ".", and cannot contain \\ / : * ? " ' < > ; # $ { } , + = [ ] | or control characters.`
     );
   }
 
@@ -246,6 +246,49 @@ function parseAzurePathParts(
     identifier: `${organization}/${project}`,
     repository,
   };
+}
+
+function isValidAzureProjectName(name: string): boolean {
+  const disallowedChars = new Set([
+    '\\',
+    '/',
+    ':',
+    '*',
+    '?',
+    '"',
+    "'",
+    '<',
+    '>',
+    ';',
+    '#',
+    '$',
+    '{',
+    '}',
+    ',',
+    '+',
+    '=',
+    '[',
+    ']',
+    '|',
+  ]);
+
+  if (name.length === 0 || name.length > 64) {
+    return false;
+  }
+
+  if (name.startsWith('_') || name.startsWith('.') || name.endsWith('.')) {
+    return false;
+  }
+
+  if ([...name].some(char => disallowedChars.has(char))) {
+    return false;
+  }
+
+  if (/\p{C}|\p{Cs}/u.test(name)) {
+    return false;
+  }
+
+  return true;
 }
 
 /**

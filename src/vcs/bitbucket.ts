@@ -13,6 +13,7 @@ import {
 import { processConcurrentlySettled } from '../utils/concurrent';
 import { isNotFoundError } from '../utils/error-handler';
 import { createRepositoryCacheKey } from '../utils/repository-mapper';
+import { isSafeRegexPattern } from '../utils/regex-safety';
 import { API_DEFAULTS } from '../constants';
 
 dotenv.config({ quiet: true });
@@ -137,9 +138,33 @@ export class BitbucketService extends BaseVcsService {
 
     if (config.repoPattern) {
       try {
+        if (!isSafeRegexPattern(config.repoPattern)) {
+          try {
+            new RegExp(config.repoPattern);
+          } catch (error) {
+            throw new VcsError(
+              `Invalid repository regex pattern: ${config.repoPattern}`,
+              VcsErrorType.INVALID_CONFIGURATION,
+              config.platform,
+              undefined,
+              error instanceof Error ? error : undefined
+            );
+          }
+
+          throw new VcsError(
+            `Unsafe repository regex pattern: ${config.repoPattern}`,
+            VcsErrorType.INVALID_CONFIGURATION,
+            config.platform
+          );
+        }
+
         this.repoPattern = new RegExp(config.repoPattern);
         this.logger.info(`Repository filter pattern initialized: ${config.repoPattern}`);
       } catch (error) {
+        if (error instanceof VcsError) {
+          throw error;
+        }
+
         throw new VcsError(
           `Invalid repository regex pattern: ${config.repoPattern}`,
           VcsErrorType.INVALID_CONFIGURATION,
@@ -466,6 +491,7 @@ export class BitbucketService extends BaseVcsService {
       name: repository.slug || repository.name,
       fullName,
       defaultBranch: repository.mainbranch?.name || 'main',
+      // Bitbucket Cloud has no archived field; default to false for compatibility.
       archived: false,
       private: repository.is_private,
       url: webUrl,
@@ -665,17 +691,28 @@ export class BitbucketService extends BaseVcsService {
 
   private async request(pathOrUrl: string, accept: string): Promise<Response> {
     const url = this.resolveUrl(pathOrUrl);
-    const response = await this.executeWithRetry(
-      () =>
-        fetch(url, {
+    const response = await this.executeWithRetry(async () => {
+      const controller = new AbortController();
+      const timeoutHandle = setTimeout(() => controller.abort(), API_DEFAULTS.REQUEST_TIMEOUT);
+
+      try {
+        return await fetch(url, {
           method: 'GET',
           headers: {
             Authorization: this.authHeader,
             Accept: accept,
           },
-        }),
-      `Bitbucket API request: ${url}`
-    );
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (this.isAbortError(error)) {
+          throw this.createTimeoutHttpError(url);
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutHandle);
+      }
+    }, `Bitbucket API request: ${url}`);
 
     if (!response.ok) {
       throw await this.createHttpError(response);
@@ -690,6 +727,23 @@ export class BitbucketService extends BaseVcsService {
     }
 
     return `${this.apiBaseUrl}${pathOrUrl}`;
+  }
+
+  private isAbortError(error: unknown): boolean {
+    return (
+      (error instanceof DOMException && error.name === 'AbortError') ||
+      (error instanceof Error && error.name === 'AbortError')
+    );
+  }
+
+  private createTimeoutHttpError(url: string): Error & HttpErrorShape {
+    const message = `Bitbucket API request timed out after ${API_DEFAULTS.REQUEST_TIMEOUT}ms: ${url}`;
+    const error = new Error(message) as Error & HttpErrorShape;
+    error.response = {
+      status: 408,
+      data: { message },
+    };
+    return error;
   }
 
   private resolveHost(configHost?: string): string {

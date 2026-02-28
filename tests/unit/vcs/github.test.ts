@@ -117,6 +117,17 @@ describe('GitHubService', () => {
           )
       ).toThrow('Invalid repository regex pattern');
     });
+
+    it('should throw error for unsafe repository pattern', () => {
+      expect(
+        () =>
+          new GitHubService(
+            createDefaultConfig({
+              repoPattern: '(a+)+$',
+            })
+          )
+      ).toThrow('Unsafe repository regex pattern');
+    });
   });
 
   describe('repositoryExists', () => {

@@ -89,6 +89,19 @@ describe('VcsServiceFactory', () => {
       expect(service.platformName).toBe('Azure DevOps');
     });
 
+    it('should create Azure DevOps self-hosted service', () => {
+      const config = {
+        platform: VcsPlatform.AZURE_DEVOPS_SELF_HOSTED,
+        azureDevopsToken: 'test-token',
+        azureDevopsHost: 'https://azure.example.com',
+        debug: false,
+      };
+
+      const service = VcsServiceFactory.createService(config);
+      expect(service).toBeDefined();
+      expect(service.platformName).toBe('Azure DevOps');
+    });
+
     it('should create Bitbucket service', () => {
       const config = {
         platform: VcsPlatform.BITBUCKET,

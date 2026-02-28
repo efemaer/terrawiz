@@ -104,16 +104,24 @@ export function extractErrorMessage(error: unknown, platform: VcsPlatform): stri
   }
 
   if (platform === VcsPlatform.GITLAB || platform === VcsPlatform.GITLAB_SELF_HOSTED) {
-    return extractResponseMessage(error);
+    const responseMessage = extractResponseMessage(error);
+    if (responseMessage !== null) {
+      return responseMessage;
+    }
+    return error instanceof Error ? error.message : String(error);
   }
 
   if (platform === VcsPlatform.AZURE_DEVOPS || platform === VcsPlatform.AZURE_DEVOPS_SELF_HOSTED) {
-    return extractResponseMessage(error);
+    const responseMessage = extractResponseMessage(error);
+    if (responseMessage !== null) {
+      return responseMessage;
+    }
+    return error instanceof Error ? error.message : String(error);
   }
 
   if (platform === VcsPlatform.BITBUCKET || platform === VcsPlatform.BITBUCKET_SELF_HOSTED) {
     const responseMessage = extractResponseMessage(error);
-    if (responseMessage !== String(error)) {
+    if (responseMessage !== null) {
       return responseMessage;
     }
 
@@ -148,7 +156,7 @@ function hasResponseStatus(error: unknown, ...expectedStatuses: number[]): boole
   );
 }
 
-function extractResponseMessage(error: unknown): string {
+function extractResponseMessage(error: unknown): string | null {
   if (
     error &&
     typeof error === 'object' &&
@@ -163,5 +171,5 @@ function extractResponseMessage(error: unknown): string {
     }
   }
 
-  return error instanceof Error ? error.message : String(error);
+  return null;
 }

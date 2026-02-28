@@ -113,6 +113,16 @@ describe('Source Parser', () => {
         });
       });
 
+      it('should allow Azure DevOps projects with spaces', () => {
+        const result = parseSource('azure:myorg/My Project');
+        expect(result).toEqual({
+          platform: VcsPlatform.AZURE_DEVOPS,
+          identifier: 'myorg/My Project',
+          repository: undefined,
+          originalInput: 'azure:myorg/My Project',
+        });
+      });
+
       it('should parse Azure DevOps organization with project and repository', () => {
         const result = parseSource('azure:myorg/myproject/myrepo');
         expect(result).toEqual({
@@ -126,6 +136,26 @@ describe('Source Parser', () => {
       it('should handle Azure DevOps aliases', () => {
         expect(parseSource('azdo:myorg').platform).toBe(VcsPlatform.AZURE_DEVOPS);
         expect(parseSource('ado:myorg').platform).toBe(VcsPlatform.AZURE_DEVOPS);
+      });
+
+      it('should reject Azure DevOps projects that start with underscore', () => {
+        expect(() => parseSource('azure:myorg/_project')).toThrow('Invalid azure-devops project');
+      });
+
+      it('should reject Azure DevOps projects with leading or trailing periods', () => {
+        expect(() => parseSource('azure:myorg/.project')).toThrow('Invalid azure-devops project');
+        expect(() => parseSource('azure:myorg/project.')).toThrow('Invalid azure-devops project');
+      });
+
+      it('should reject Azure DevOps projects with disallowed characters', () => {
+        expect(() => parseSource('azure:myorg/my?project')).toThrow('Invalid azure-devops project');
+      });
+
+      it('should reject Azure DevOps projects longer than 64 characters', () => {
+        const longProject = 'a'.repeat(65);
+        expect(() => parseSource(`azure:myorg/${longProject}`)).toThrow(
+          'Invalid azure-devops project'
+        );
       });
     });
 

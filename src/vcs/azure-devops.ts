@@ -12,7 +12,8 @@ import {
 import { processConcurrentlySettled } from '../utils/concurrent';
 import { isNotFoundError } from '../utils/error-handler';
 import { createRepositoryCacheKey } from '../utils/repository-mapper';
-import { API_DEFAULTS } from '../constants';
+import { isSafeRegexPattern } from '../utils/regex-safety';
+import { API_DEFAULTS, VCS_CONSTANTS } from '../constants';
 
 dotenv.config({ quiet: true });
 
@@ -24,6 +25,7 @@ interface AzureListResponse<T> {
 interface AzureProject {
   id: string;
   name: string;
+  visibility?: string;
   state?: string;
 }
 
@@ -108,9 +110,33 @@ export class AzureDevOpsService extends BaseVcsService {
 
     if (config.repoPattern) {
       try {
+        if (!isSafeRegexPattern(config.repoPattern)) {
+          try {
+            new RegExp(config.repoPattern);
+          } catch (error) {
+            throw new VcsError(
+              `Invalid repository regex pattern: ${config.repoPattern}`,
+              VcsErrorType.INVALID_CONFIGURATION,
+              config.platform,
+              undefined,
+              error instanceof Error ? error : undefined
+            );
+          }
+
+          throw new VcsError(
+            `Unsafe repository regex pattern: ${config.repoPattern}`,
+            VcsErrorType.INVALID_CONFIGURATION,
+            config.platform
+          );
+        }
+
         this.repoPattern = new RegExp(config.repoPattern);
         this.logger.info(`Repository filter pattern initialized: ${config.repoPattern}`);
       } catch (error) {
+        if (error instanceof VcsError) {
+          throw error;
+        }
+
         throw new VcsError(
           `Invalid repository regex pattern: ${config.repoPattern}`,
           VcsErrorType.INVALID_CONFIGURATION,
@@ -211,10 +237,12 @@ export class AzureDevOpsService extends BaseVcsService {
       let reachedLimit = false;
 
       if (scope.project) {
+        const projectDetails = await this.getProject(scope.organization, scope.project);
         const projectRepos = await this.listProjectRepositories(scope.organization, scope.project);
         reachedLimit = this.collectRepositoriesFromProject(
           scope.organization,
           scope.project,
+          projectDetails?.visibility,
           projectRepos,
           repositories,
           maxRepos,
@@ -231,6 +259,7 @@ export class AzureDevOpsService extends BaseVcsService {
           reachedLimit = this.collectRepositoriesFromProject(
             scope.organization,
             project.name,
+            project.visibility,
             projectRepos,
             repositories,
             maxRepos,
@@ -284,7 +313,7 @@ export class AzureDevOpsService extends BaseVcsService {
         includeContentMetadata: 'true',
         'versionDescriptor.versionType': 'branch',
         'versionDescriptor.version': repository.defaultBranch,
-        'api-version': '7.1',
+        'api-version': VCS_CONSTANTS.AZURE_DEVOPS_API_VERSION,
       });
 
       const itemsResponse = await this.requestJson<AzureListResponse<AzureItem>>(
@@ -421,20 +450,27 @@ export class AzureDevOpsService extends BaseVcsService {
     }
 
     if (target.project) {
+      const projectDetails = await this.getProject(target.organization, target.project);
       const repository = await this.getRepositoryInProject(
         target.organization,
         target.project,
-        target.repositoryName
+        target.repositoryName,
+        projectDetails?.visibility
       );
       return repository;
     }
+
+    this.logger.warn(
+      `No Azure DevOps project specified for ${target.organization}/${target.repositoryName}; scanning all projects to find the repository`
+    );
 
     const projects = await this.listProjects(target.organization);
     for (const project of projects) {
       const repository = await this.getRepositoryInProject(
         target.organization,
         project.name,
-        target.repositoryName
+        target.repositoryName,
+        project.visibility
       );
       if (repository) {
         return repository;
@@ -447,7 +483,8 @@ export class AzureDevOpsService extends BaseVcsService {
   private async getRepositoryInProject(
     organization: string,
     project: string,
-    repositoryName: string
+    repositoryName: string,
+    projectVisibility?: string
   ): Promise<VcsRepository | null> {
     const repositories = await this.listProjectRepositories(organization, project);
     const normalizedName = repositoryName.toLowerCase();
@@ -459,19 +496,20 @@ export class AzureDevOpsService extends BaseVcsService {
       return null;
     }
 
-    return this.mapRepository(organization, project, repository);
+    return this.mapRepository(organization, project, repository, projectVisibility);
   }
 
   private collectRepositoriesFromProject(
     organization: string,
     project: string,
+    projectVisibility: string | undefined,
     projectRepos: AzureRepositoryResponse[],
     repositories: VcsRepository[],
     maxRepos: number | undefined,
     onSkipped: (value: { archived: number; pattern: number }) => void
   ): boolean {
     for (const projectRepo of projectRepos) {
-      const repository = this.mapRepository(organization, project, projectRepo);
+      const repository = this.mapRepository(organization, project, projectRepo, projectVisibility);
 
       if (this.processedRepoCache.has(repository.fullName)) {
         continue;
@@ -501,7 +539,8 @@ export class AzureDevOpsService extends BaseVcsService {
   private mapRepository(
     organization: string,
     project: string,
-    repository: AzureRepositoryResponse
+    repository: AzureRepositoryResponse,
+    projectVisibility?: string
   ): VcsRepository {
     const defaultBranch = repository.defaultBranch?.replace(/^refs\/heads\//, '') || 'main';
     const owner = `${organization}/${project}`;
@@ -511,7 +550,7 @@ export class AzureDevOpsService extends BaseVcsService {
       fullName: `${owner}/${repository.name}`,
       defaultBranch,
       archived: repository.isDisabled === true,
-      private: true,
+      private: projectVisibility !== 'public',
       url: repository.webUrl,
       cloneUrl: repository.remoteUrl,
     };
@@ -523,7 +562,7 @@ export class AzureDevOpsService extends BaseVcsService {
 
     do {
       const query = new URLSearchParams({
-        'api-version': '7.1-preview.4',
+        'api-version': `${VCS_CONSTANTS.AZURE_DEVOPS_API_VERSION}-preview.4`,
         $top: String(API_DEFAULTS.AZURE_DEVOPS_PAGE_SIZE),
       });
 
@@ -552,7 +591,7 @@ export class AzureDevOpsService extends BaseVcsService {
     project: string
   ): Promise<AzureRepositoryResponse[]> {
     const query = new URLSearchParams({
-      'api-version': '7.1',
+      'api-version': VCS_CONSTANTS.AZURE_DEVOPS_API_VERSION,
     });
 
     const response = await this.requestJson<AzureListResponse<AzureRepositoryResponse>>(
@@ -560,6 +599,24 @@ export class AzureDevOpsService extends BaseVcsService {
     );
 
     return response.data.value;
+  }
+
+  private async getProject(organization: string, project: string): Promise<AzureProject | null> {
+    const query = new URLSearchParams({
+      'api-version': VCS_CONSTANTS.AZURE_DEVOPS_API_VERSION,
+    });
+
+    try {
+      const response = await this.requestJson<AzureProject>(
+        `/${encodeURIComponent(organization)}/_apis/projects/${encodeURIComponent(project)}?${query.toString()}`
+      );
+      return response.data;
+    } catch (error) {
+      if (isNotFoundError(error, this.platform)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   private async getFileContent(
@@ -574,7 +631,7 @@ export class AzureDevOpsService extends BaseVcsService {
       'versionDescriptor.versionType': 'branch',
       'versionDescriptor.version': branch,
       $format: 'text',
-      'api-version': '7.1',
+      'api-version': VCS_CONSTANTS.AZURE_DEVOPS_API_VERSION,
     });
 
     return this.requestText(

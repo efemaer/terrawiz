@@ -63,7 +63,7 @@ export const PROGRESS_THRESHOLDS = {
 export const VCS_CONSTANTS = {
   GITHUB_API_VERSION: '2022-11-28',
   GITLAB_API_VERSION: 'v4',
-  AZURE_DEVOPS_API_VERSION: '7.1',
+  AZURE_DEVOPS_API_VERSION: '7.2',
   BITBUCKET_API_VERSION: '2.0',
   DEFAULT_BRANCH_NAMES: ['main', 'master', 'develop'],
 } as const;

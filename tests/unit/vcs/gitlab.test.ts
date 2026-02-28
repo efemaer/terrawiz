@@ -99,6 +99,17 @@ describe('GitLabService', () => {
           )
       ).toThrow('Invalid repository regex pattern');
     });
+
+    it('should throw error for unsafe repository pattern', () => {
+      expect(
+        () =>
+          new GitLabService(
+            createDefaultConfig({
+              repoPattern: '(a+)+$',
+            })
+          )
+      ).toThrow('Unsafe repository regex pattern');
+    });
   });
 
   describe('repositoryExists', () => {

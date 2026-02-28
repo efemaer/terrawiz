@@ -57,7 +57,9 @@ describe('Error Handler Utils', () => {
     it('should detect Azure DevOps and Bitbucket rate limit errors', () => {
       const error = { response: { status: 429 } };
       expect(isRateLimitError(error, VcsPlatform.AZURE_DEVOPS)).toBe(true);
+      expect(isRateLimitError(error, VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(true);
       expect(isRateLimitError(error, VcsPlatform.BITBUCKET)).toBe(true);
+      expect(isRateLimitError(error, VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
     });
 
     it('should return false for non-rate-limit errors', () => {
@@ -92,8 +94,12 @@ describe('Error Handler Utils', () => {
 
       expect(isAuthError(error401, VcsPlatform.AZURE_DEVOPS)).toBe(true);
       expect(isAuthError(error403, VcsPlatform.AZURE_DEVOPS)).toBe(true);
+      expect(isAuthError(error401, VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(true);
+      expect(isAuthError(error403, VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(true);
       expect(isAuthError(error401, VcsPlatform.BITBUCKET)).toBe(true);
       expect(isAuthError(error403, VcsPlatform.BITBUCKET)).toBe(true);
+      expect(isAuthError(error401, VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
+      expect(isAuthError(error403, VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
     });
 
     it('should return false for non-auth errors', () => {
