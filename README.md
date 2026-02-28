@@ -174,11 +174,27 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
   - Scan absolute path: `terrawiz scan local:/path/to/terraform`
 
 - CI/CD & Docker
-  - Docker (GitHub example):
+  - 1) Set your token:
+    ```bash
+    export GITHUB_TOKEN=your_token
+    ```
+  - 2) Run a GitHub scan:
     ```bash
     docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN \
       ghcr.io/efemaer/terrawiz:latest scan github:your-org -f json
     ```
+  - 3) Export a report to your current directory:
+    ```bash
+    docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN \
+      --mount type=bind,src="$(pwd)",target=/workspace \
+      ghcr.io/efemaer/terrawiz:latest scan github:your-org --terraform-only -f json -e export.json
+    ```
+  - 4) Scan local files from your current directory:
+    ```bash
+    docker run --rm --mount type=bind,src="$(pwd)",target=/workspace \
+      ghcr.io/efemaer/terrawiz:latest scan local:/workspace
+    ```
+  - Always mount host paths to `/workspace` (never `/app` or `/opt/terrawiz`).
 
 - No‑install option
   - Prefer not to install globally? Run once with: `npx terrawiz scan github:your-org`

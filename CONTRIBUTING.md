@@ -221,7 +221,7 @@ enum VcsErrorType {
 
 #### Prerequisites
 
-- **Node.js**: Version 22 or higher
+- **Node.js**: Version 24 or higher
 - **npm**: Latest version
 - **Git**: For version control
 - **Platform Tokens**: GitHub and/or GitLab tokens for testing
