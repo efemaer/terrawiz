@@ -10,6 +10,8 @@ export enum VcsPlatform {
   GITHUB_SELF_HOSTED = 'github-self-hosted',
   GITLAB = 'gitlab',
   GITLAB_SELF_HOSTED = 'gitlab-self-hosted',
+  AZURE_DEVOPS = 'azure-devops',
+  AZURE_DEVOPS_SELF_HOSTED = 'azure-devops-self-hosted',
   BITBUCKET = 'bitbucket',
   BITBUCKET_SELF_HOSTED = 'bitbucket-self-hosted',
   LOCAL = 'local',

@@ -15,6 +15,18 @@ jest.mock('../../../src/vcs/gitlab', () => ({
   })),
 }));
 
+jest.mock('../../../src/vcs/azure-devops', () => ({
+  AzureDevOpsService: jest.fn().mockImplementation(() => ({
+    platformName: 'Azure DevOps',
+  })),
+}));
+
+jest.mock('../../../src/vcs/bitbucket', () => ({
+  BitbucketService: jest.fn().mockImplementation(() => ({
+    platformName: 'Bitbucket',
+  })),
+}));
+
 describe('VcsServiceFactory', () => {
   describe('createService', () => {
     it('should create GitHub service', () => {
@@ -65,15 +77,54 @@ describe('VcsServiceFactory', () => {
       expect(service.platformName).toBe('GitLab');
     });
 
-    it('should throw error for unsupported Bitbucket platform', () => {
+    it('should create Azure DevOps service', () => {
       const config = {
-        platform: VcsPlatform.BITBUCKET,
+        platform: VcsPlatform.AZURE_DEVOPS,
+        azureDevopsToken: 'test-token',
         debug: false,
       };
 
-      expect(() => VcsServiceFactory.createService(config)).toThrow(
-        'Platform bitbucket is not yet supported. Currently supported platforms: github, github-self-hosted, gitlab, gitlab-self-hosted'
-      );
+      const service = VcsServiceFactory.createService(config);
+      expect(service).toBeDefined();
+      expect(service.platformName).toBe('Azure DevOps');
+    });
+
+    it('should create Azure DevOps self-hosted service', () => {
+      const config = {
+        platform: VcsPlatform.AZURE_DEVOPS_SELF_HOSTED,
+        azureDevopsToken: 'test-token',
+        azureDevopsHost: 'https://azure.example.com',
+        debug: false,
+      };
+
+      const service = VcsServiceFactory.createService(config);
+      expect(service).toBeDefined();
+      expect(service.platformName).toBe('Azure DevOps');
+    });
+
+    it('should create Bitbucket service', () => {
+      const config = {
+        platform: VcsPlatform.BITBUCKET,
+        bitbucketToken: 'test-token',
+        debug: false,
+      };
+
+      const service = VcsServiceFactory.createService(config);
+      expect(service).toBeDefined();
+      expect(service.platformName).toBe('Bitbucket');
+    });
+
+    it('should create Bitbucket self-hosted service', () => {
+      const config = {
+        platform: VcsPlatform.BITBUCKET_SELF_HOSTED,
+        bitbucketToken: 'test-token',
+        bitbucketHost: 'https://bitbucket.example.com',
+        debug: false,
+      };
+
+      const service = VcsServiceFactory.createService(config);
+      expect(service).toBeDefined();
+      expect(service.platformName).toBe('Bitbucket');
     });
 
     it('should throw error for unknown platform', () => {
@@ -94,6 +145,10 @@ describe('VcsServiceFactory', () => {
         VcsPlatform.GITHUB_SELF_HOSTED,
         VcsPlatform.GITLAB,
         VcsPlatform.GITLAB_SELF_HOSTED,
+        VcsPlatform.AZURE_DEVOPS,
+        VcsPlatform.AZURE_DEVOPS_SELF_HOSTED,
+        VcsPlatform.BITBUCKET,
+        VcsPlatform.BITBUCKET_SELF_HOSTED,
       ]);
     });
   });
@@ -104,12 +159,16 @@ describe('VcsServiceFactory', () => {
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.GITHUB_SELF_HOSTED)).toBe(true);
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.GITLAB)).toBe(true);
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.GITLAB_SELF_HOSTED)).toBe(true);
+      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.AZURE_DEVOPS)).toBe(true);
+      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(
+        true
+      );
+      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.BITBUCKET)).toBe(true);
+      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
     });
 
-    it('should return false for unsupported platforms and local (handled separately)', () => {
+    it('should return false for local platform', () => {
       expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.LOCAL)).toBe(false);
-      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.BITBUCKET)).toBe(false);
-      expect(VcsServiceFactory.isPlatformSupported(VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(false);
     });
   });
 });

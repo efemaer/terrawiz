@@ -1,6 +1,6 @@
 # Terrawiz
 
-Discover and analyze Terraform and Terragrunt modules across GitHub, GitLab, and local filesystems. Terrawiz gives you clear visibility into IaC usage: inventory modules, track versions, and export reports.
+Discover and analyze Terraform and Terragrunt modules across GitHub, GitLab, Azure DevOps, Bitbucket, and local filesystems. Terrawiz gives you clear visibility into IaC usage: inventory modules, track versions, and export reports.
 
 [![npm version](https://img.shields.io/npm/v/terrawiz.svg)](https://www.npmjs.com/package/terrawiz)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
@@ -8,6 +8,7 @@ Discover and analyze Terraform and Terragrunt modules across GitHub, GitLab, and
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Key Features
+
 - Discover Terraform (.tf) and Terragrunt (.hcl) modules across repositories
 - Summarize usage by module source and version constraints
 - Export results as table, JSON, or CSV
@@ -17,18 +18,21 @@ Discover and analyze Terraform and Terragrunt modules across GitHub, GitLab, and
 
 ## Quick Start (GitHub)
 
-1) Install the CLI
+1. Install the CLI
+
 ```bash
 npm install -g terrawiz
 ```
 
-2) Set a GitHub token
+2. Set a GitHub token
+
 ```bash
 # https://github.com/settings/tokens
 export GITHUB_TOKEN=your_token
 ```
 
-3) Run your first scan
+3. Run your first scan
+
 ```bash
 # Scan a GitHub organization
 terrawiz scan github:your-org
@@ -37,7 +41,8 @@ terrawiz scan github:your-org
 terrawiz scan github:your-org/your-repo
 ```
 
-4) Export results (optional)
+4. Export results (optional)
+
 ```bash
 # JSON report
 terrawiz scan github:your-org -f json -e audit.json
@@ -51,9 +56,11 @@ terrawiz scan github:your-org -f csv -e modules.csv
 The examples below are captured from running the command against the repository `github:hashicorp/terraform-guides`.
 
 Table (human‑readable):
+
 ```bash
 terrawiz scan github:hashicorp/terraform-guides
 ```
+
 ```
 Infrastructure as Code Module Usage Report
 ============================
@@ -77,6 +84,7 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp (1 instances, type: g
 ```
 
 JSON (API‑friendly):
+
 ```json
 {
   "metadata": {
@@ -98,6 +106,7 @@ JSON (API‑friendly):
 ```
 
 CSV (spreadsheet‑ready):
+
 ```csv
 module,source_type,file_type,version,repository,file_path,line_number,file_link
 Azure/compute/azurerm,registry,terraform,1.1.5,hashicorp/terraform-guides,infrastructure-as-code/azure-vm/main.tf,19,https://github.com/hashicorp/terraform-guides/blob/master/infrastructure-as-code/azure-vm/main.tf#L19
@@ -116,6 +125,19 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
   - Env var: `GITLAB_TOKEN` (required)
   - Scope: `read_api` (or `api`) for private projects; sufficient rights to list projects and read files.
   - Self‑hosted GitLab uses the same `GITLAB_TOKEN`; include the host in the source (e.g., `gitlab://gitlab.company.com/group`).
+
+- Azure DevOps
+  - Env var: `AZURE_DEVOPS_TOKEN` (required)
+  - Scope: a PAT with read access to code repositories (`Code (Read)`).
+  - Examples: `azure:organization/project`, `azure:organization/project/repository`.
+
+- Bitbucket
+  - Env var: `BITBUCKET_TOKEN` (required)
+  - Use an OAuth bearer token, or set `BITBUCKET_TOKEN` to `username:app_password` for app-password auth.
+  - For self-hosted Bitbucket Server/Data Center, use a personal access token and provide the host in source format (`bitbucket://host/...`) or set `BITBUCKET_HOST`.
+  - Examples:
+    - Cloud: `bitbucket:workspace`, `bitbucket:workspace/repository`
+    - Self-hosted: `bitbucket://bitbucket.example.com/PROJECT`, `bitbucket://bitbucket.example.com/PROJECT/repository`
 
 - Local
   - No authentication required for `local:` sources.
@@ -136,8 +158,11 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
     - GitHub Enterprise: `github://host/org` or `github://host/org/repo`
     - GitLab (cloud): `gitlab:group` or `gitlab:group/project`
     - GitLab Self‑Hosted: `gitlab://host/group` or `gitlab://host/group/project`
+    - Azure DevOps: `azure:organization`, `azure:organization/project`, or `azure:organization/project/repository`
+    - Azure DevOps Self‑Hosted: `azure://host/organization/project` or `azure://host/organization/project/repository`
+    - Bitbucket (cloud): `bitbucket:workspace` or `bitbucket:workspace/repository`
+    - Bitbucket self-hosted (Server/Data Center): `bitbucket://host/PROJECT` or `bitbucket://host/PROJECT/repository`
     - Local filesystem: `local:.`, `local:/abs/path`, `local:./relative/path`
-    - Note: Bitbucket is not supported yet.
 
 - Options
   - `-f, --format <format>` — Output format: `table` (default), `json`, `csv`
@@ -168,28 +193,30 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
 - Enterprise/self‑hosted targets
   - GitHub Enterprise: `github://github.company.com/org`
   - GitLab self‑hosted: `gitlab://gitlab.company.com/group`
+  - Azure DevOps self‑hosted: `azure://azure.company.com/org/project`
+  - Bitbucket self‑hosted: `bitbucket://bitbucket.company.com/PROJECT/repository`
 
 - Local scanning
   - Scan current project: `terrawiz scan local:.`
   - Scan absolute path: `terrawiz scan local:/path/to/terraform`
 
 - CI/CD & Docker
-  - 1) Set your token:
+  - 1. Set your token:
     ```bash
     export GITHUB_TOKEN=your_token
     ```
-  - 2) Run a GitHub scan:
+  - 2. Run a GitHub scan:
     ```bash
     docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN \
       ghcr.io/efemaer/terrawiz:latest scan github:your-org -f json
     ```
-  - 3) Export a report to your current directory:
+  - 3. Export a report to your current directory:
     ```bash
     docker run --rm -e GITHUB_TOKEN=$GITHUB_TOKEN \
       --mount type=bind,src="$(pwd)",target=/workspace \
       ghcr.io/efemaer/terrawiz:latest scan github:your-org --terraform-only -f json -e export.json
     ```
-  - 4) Scan local files from your current directory:
+  - 4. Scan local files from your current directory:
     ```bash
     docker run --rm --mount type=bind,src="$(pwd)",target=/workspace \
       ghcr.io/efemaer/terrawiz:latest scan local:/workspace
@@ -204,6 +231,7 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 Quick start:
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Run checks: `npm test && npm run lint && npm run format:check`

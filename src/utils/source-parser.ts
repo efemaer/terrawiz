@@ -18,6 +18,7 @@ export interface ParsedSource {
  * Supported formats:
  * - github:org[/repo]
  * - gitlab:group[/project]
+ * - azure:organization[/project][/repo]
  * - gitlab://custom-host.com/group[/project] (self-hosted)
  * - bitbucket:workspace[/repo]
  * - local:/absolute/path
@@ -77,8 +78,8 @@ function parseUrlStyleSource(originalInput: string): ParsedSource {
       throw new Error(`Invalid URL: missing group/organization in path`);
     }
 
-    const identifier = pathParts[0];
-    const repository = pathParts.length > 1 ? pathParts.slice(1).join('/') : undefined;
+    let identifier = pathParts[0];
+    let repository = pathParts.length > 1 ? pathParts.slice(1).join('/') : undefined;
 
     // For self-hosted instances, determine the platform variant
     let adjustedPlatform = platform;
@@ -86,6 +87,16 @@ function parseUrlStyleSource(originalInput: string): ParsedSource {
       adjustedPlatform = VcsPlatform.GITLAB_SELF_HOSTED;
     } else if (platform === VcsPlatform.GITHUB && url.hostname !== 'github.com') {
       adjustedPlatform = VcsPlatform.GITHUB_SELF_HOSTED;
+    } else if (platform === VcsPlatform.BITBUCKET && url.hostname !== 'bitbucket.org') {
+      adjustedPlatform = VcsPlatform.BITBUCKET_SELF_HOSTED;
+    } else if (platform === VcsPlatform.AZURE_DEVOPS && url.hostname !== 'dev.azure.com') {
+      adjustedPlatform = VcsPlatform.AZURE_DEVOPS_SELF_HOSTED;
+    }
+
+    if (platform === VcsPlatform.AZURE_DEVOPS) {
+      const azureParsed = parseAzurePathParts(pathParts, originalInput, adjustedPlatform);
+      identifier = azureParsed.identifier;
+      repository = azureParsed.repository;
     }
 
     // Construct the host URL manually since platform:// is not a standard protocol
@@ -138,6 +149,10 @@ function parseVcsSource(
   platform: VcsPlatform,
   remainder: string
 ): ParsedSource {
+  if (platform === VcsPlatform.AZURE_DEVOPS || platform === VcsPlatform.AZURE_DEVOPS_SELF_HOSTED) {
+    return parseAzureSource(originalInput, platform, remainder);
+  }
+
   // Split on '/' to separate org/group from repo/project
   const parts = remainder.split('/');
 
@@ -170,6 +185,112 @@ function parseVcsSource(
   };
 }
 
+function parseAzureSource(
+  originalInput: string,
+  platform: VcsPlatform,
+  remainder: string
+): ParsedSource {
+  const parts = remainder.split('/').filter(part => part.length > 0);
+  const parsed = parseAzurePathParts(parts, originalInput, platform);
+
+  return {
+    platform: parsed.platform,
+    identifier: parsed.identifier,
+    repository: parsed.repository,
+    originalInput,
+  };
+}
+
+function parseAzurePathParts(
+  parts: string[],
+  originalInput: string,
+  platform: VcsPlatform
+): { platform: VcsPlatform; identifier: string; repository?: string } {
+  if (parts.length === 0) {
+    throw new Error(
+      `Invalid ${platform} identifier: "${originalInput}". Expected format: organization[/project][/repo]`
+    );
+  }
+
+  const organization = parts[0];
+  if (!/^[a-zA-Z0-9._-]+$/.test(organization)) {
+    throw new Error(
+      `Invalid ${platform} organization: "${organization}". Must contain only alphanumeric characters, dots, hyphens, and underscores.`
+    );
+  }
+
+  if (parts.length === 1) {
+    return {
+      platform,
+      identifier: organization,
+      repository: undefined,
+    };
+  }
+
+  const project = parts[1];
+  if (!isValidAzureProjectName(project)) {
+    throw new Error(
+      `Invalid ${platform} project: "${project}". Project names must be 1-64 characters, cannot start with "_" or start/end with ".", and cannot contain \\ / : * ? " ' < > ; # $ { } , + = [ ] | or control characters.`
+    );
+  }
+
+  const repository = parts.length > 2 ? parts.slice(2).join('/') : undefined;
+  if (repository && !/^[a-zA-Z0-9._/-]+$/.test(repository)) {
+    throw new Error(
+      `Invalid ${platform} repository: "${repository}". Must contain only alphanumeric characters, dots, hyphens, underscores, and slashes.`
+    );
+  }
+
+  return {
+    platform,
+    identifier: `${organization}/${project}`,
+    repository,
+  };
+}
+
+function isValidAzureProjectName(name: string): boolean {
+  const disallowedChars = new Set([
+    '\\',
+    '/',
+    ':',
+    '*',
+    '?',
+    '"',
+    "'",
+    '<',
+    '>',
+    ';',
+    '#',
+    '$',
+    '{',
+    '}',
+    ',',
+    '+',
+    '=',
+    '[',
+    ']',
+    '|',
+  ]);
+
+  if (name.length === 0 || name.length > 64) {
+    return false;
+  }
+
+  if (name.startsWith('_') || name.startsWith('.') || name.endsWith('.')) {
+    return false;
+  }
+
+  if ([...name].some(char => disallowedChars.has(char))) {
+    return false;
+  }
+
+  if (/\p{C}|\p{Cs}/u.test(name)) {
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Validate and normalize platform string
  */
@@ -182,6 +303,9 @@ function validateAndNormalizePlatform(platformStr: string): VcsPlatform {
     gh: VcsPlatform.GITHUB, // Short alias
     gitlab: VcsPlatform.GITLAB,
     gl: VcsPlatform.GITLAB, // Short alias
+    azure: VcsPlatform.AZURE_DEVOPS,
+    azdo: VcsPlatform.AZURE_DEVOPS,
+    ado: VcsPlatform.AZURE_DEVOPS,
     bitbucket: VcsPlatform.BITBUCKET,
     bb: VcsPlatform.BITBUCKET, // Short alias
     local: VcsPlatform.LOCAL,
@@ -226,6 +350,8 @@ export function getPlatformDisplayName(platform: VcsPlatform): string {
     [VcsPlatform.GITHUB_SELF_HOSTED]: 'GitHub Self-Hosted',
     [VcsPlatform.GITLAB]: 'GitLab',
     [VcsPlatform.GITLAB_SELF_HOSTED]: 'GitLab Self-Hosted',
+    [VcsPlatform.AZURE_DEVOPS]: 'Azure DevOps',
+    [VcsPlatform.AZURE_DEVOPS_SELF_HOSTED]: 'Azure DevOps Self-Hosted',
     [VcsPlatform.BITBUCKET]: 'Bitbucket',
     [VcsPlatform.BITBUCKET_SELF_HOSTED]: 'Bitbucket Self-Hosted',
     [VcsPlatform.LOCAL]: 'Local Filesystem',

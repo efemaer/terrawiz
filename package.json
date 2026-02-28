@@ -25,6 +25,8 @@
     "terragrunt",
     "github",
     "gitlab",
+    "azure-devops",
+    "bitbucket",
     "modules",
     "tracking",
     "iac",
@@ -33,7 +35,7 @@
   "author": "Mansour Kheffache",
   "repository": "github:efemaer/terrawiz",
   "license": "MIT",
-  "description": "A tool to track and analyze Terraform modules used in GitHub and GitLab repositories",
+  "description": "A tool to track and analyze Terraform modules used in GitHub, GitLab, Azure DevOps, and Bitbucket repositories",
   "engines": {
     "node": ">=24"
   },
@@ -42,8 +44,10 @@
     "@octokit/core": "^7.0.2",
     "@octokit/plugin-throttling": "^11.0.1",
     "@octokit/rest": "^22.0.0",
+    "@types/safe-regex": "^1.1.6",
     "commander": "^14.0.0",
-    "dotenv": "^17.0.0"
+    "dotenv": "^17.0.0",
+    "safe-regex": "^2.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",

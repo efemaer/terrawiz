@@ -20,6 +20,14 @@ describe('Error Handler Utils', () => {
       expect(isNotFoundError(error, VcsPlatform.GITLAB_SELF_HOSTED)).toBe(true);
     });
 
+    it('should detect Azure DevOps and Bitbucket 404 errors', () => {
+      const error = { response: { status: 404 } };
+      expect(isNotFoundError(error, VcsPlatform.AZURE_DEVOPS)).toBe(true);
+      expect(isNotFoundError(error, VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(true);
+      expect(isNotFoundError(error, VcsPlatform.BITBUCKET)).toBe(true);
+      expect(isNotFoundError(error, VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
+    });
+
     it('should return false for non-404 errors', () => {
       const githubError = { status: 500 };
       const gitlabError = { response: { status: 500 } };
@@ -44,6 +52,14 @@ describe('Error Handler Utils', () => {
     it('should detect GitLab rate limit errors', () => {
       const error = { response: { status: 429 } };
       expect(isRateLimitError(error, VcsPlatform.GITLAB)).toBe(true);
+    });
+
+    it('should detect Azure DevOps and Bitbucket rate limit errors', () => {
+      const error = { response: { status: 429 } };
+      expect(isRateLimitError(error, VcsPlatform.AZURE_DEVOPS)).toBe(true);
+      expect(isRateLimitError(error, VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(true);
+      expect(isRateLimitError(error, VcsPlatform.BITBUCKET)).toBe(true);
+      expect(isRateLimitError(error, VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
     });
 
     it('should return false for non-rate-limit errors', () => {
@@ -72,6 +88,20 @@ describe('Error Handler Utils', () => {
       expect(isAuthError(error403, VcsPlatform.GITLAB)).toBe(true);
     });
 
+    it('should detect Azure DevOps and Bitbucket auth errors', () => {
+      const error401 = { response: { status: 401 } };
+      const error403 = { response: { status: 403 } };
+
+      expect(isAuthError(error401, VcsPlatform.AZURE_DEVOPS)).toBe(true);
+      expect(isAuthError(error403, VcsPlatform.AZURE_DEVOPS)).toBe(true);
+      expect(isAuthError(error401, VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(true);
+      expect(isAuthError(error403, VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(true);
+      expect(isAuthError(error401, VcsPlatform.BITBUCKET)).toBe(true);
+      expect(isAuthError(error403, VcsPlatform.BITBUCKET)).toBe(true);
+      expect(isAuthError(error401, VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
+      expect(isAuthError(error403, VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(true);
+    });
+
     it('should return false for non-auth errors', () => {
       const githubError = { status: 404 };
       const gitlabError = { response: { status: 500 } };
@@ -90,6 +120,16 @@ describe('Error Handler Utils', () => {
     it('should extract GitLab error messages', () => {
       const error = { response: { data: { message: 'GitLab API error' } } };
       expect(extractErrorMessage(error, VcsPlatform.GITLAB)).toBe('GitLab API error');
+    });
+
+    it('should extract Azure DevOps error messages', () => {
+      const error = { response: { data: { message: 'Azure DevOps API error' } } };
+      expect(extractErrorMessage(error, VcsPlatform.AZURE_DEVOPS)).toBe('Azure DevOps API error');
+    });
+
+    it('should extract Bitbucket nested error messages', () => {
+      const error = { response: { data: { error: { message: 'Bitbucket API error' } } } };
+      expect(extractErrorMessage(error, VcsPlatform.BITBUCKET)).toBe('Bitbucket API error');
     });
 
     it('should handle Error instances', () => {
