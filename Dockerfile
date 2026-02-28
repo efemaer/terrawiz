@@ -1,52 +1,40 @@
-# Use Node.js 22 Alpine for smaller image size
-FROM node:22-alpine AS base
+# Dependency stage
+FROM node:24-alpine AS deps
+
+WORKDIR /opt/terrawiz
+COPY package*.json ./
+RUN npm install
+
+# Build stage
+FROM deps AS builder
+
+WORKDIR /opt/terrawiz
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+# Runtime stage
+FROM node:24-alpine AS production
+
+ENV NODE_ENV=production
+WORKDIR /opt/terrawiz
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S terrawiz && \
     adduser -S terrawiz -u 1001 -G terrawiz
 
-# Build stage
-FROM base AS builder
+# Copy only runtime artifacts
+COPY --from=builder /opt/terrawiz/package*.json ./
+COPY --from=builder /opt/terrawiz/node_modules ./node_modules
+COPY --from=builder /opt/terrawiz/dist ./dist
 
-WORKDIR /app
+# Dedicated workspace for user mounts and exports
+RUN mkdir -p /workspace && \
+    chown -R terrawiz:terrawiz /opt/terrawiz /workspace
 
-# Copy package files first for better layer caching
-COPY package*.json ./
-
-# Install all dependencies (including dev dependencies for building)
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build the application
-RUN npm run build
-
-# Production stage
-FROM base AS production
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-
-# Change ownership to non-root user
-RUN chown -R terrawiz:terrawiz /app
-
-# Switch to non-root user
 USER terrawiz
-
-# Create a volume for scanning local directories
+WORKDIR /workspace
 VOLUME ["/workspace"]
 
-# Expose the CLI as entrypoint
-ENTRYPOINT ["node", "dist/src/index.js"]
-
-# Default command shows help
+# Keep application path outside mounted workspace
+ENTRYPOINT ["node", "/opt/terrawiz/dist/src/index.js"]
 CMD ["--help"]
