@@ -78,6 +78,31 @@ describe('BitbucketService', () => {
         'Bitbucket token not found. Please provide token in config or set BITBUCKET_TOKEN environment variable'
       );
     });
+
+    it('should initialize Bitbucket self-hosted service with host', () => {
+      const service = new BitbucketService(
+        createDefaultConfig({
+          platform: VcsPlatform.BITBUCKET_SELF_HOSTED,
+          host: 'https://bitbucket.example.com',
+        })
+      );
+
+      expect(service.platformName).toBe('Bitbucket Self-Hosted (https://bitbucket.example.com)');
+    });
+
+    it('should throw error for self-hosted platform without host', () => {
+      expect(
+        () =>
+          new BitbucketService(
+            createDefaultConfig({
+              platform: VcsPlatform.BITBUCKET_SELF_HOSTED,
+              host: undefined,
+            })
+          )
+      ).toThrow(
+        'Bitbucket self-hosted requires a host URL (use bitbucket://host/... source format or set BITBUCKET_HOST)'
+      );
+    });
   });
 
   describe('repositoryExists', () => {
@@ -110,6 +135,36 @@ describe('BitbucketService', () => {
       const result = await service.repositoryExists('myworkspace', 'missing-repo');
 
       expect(result).toBe(false);
+    });
+
+    it('should return true for existing self-hosted repository', async () => {
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          name: 'myrepo',
+          slug: 'myrepo',
+          archived: false,
+          public: false,
+          defaultBranch: { displayId: 'main' },
+          links: {
+            self: [{ href: 'https://bitbucket.example.com/projects/PROJ/repos/myrepo/browse' }],
+            clone: [{ name: 'http', href: 'https://bitbucket.example.com/scm/proj/myrepo.git' }],
+          },
+        })
+      );
+
+      const service = new BitbucketService(
+        createDefaultConfig({
+          platform: VcsPlatform.BITBUCKET_SELF_HOSTED,
+          host: 'https://bitbucket.example.com',
+        })
+      );
+
+      const result = await service.repositoryExists('PROJ', 'myrepo');
+      expect(result).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/rest/api/latest/projects/PROJ/repos/myrepo'),
+        expect.any(Object)
+      );
     });
   });
 
@@ -151,6 +206,39 @@ describe('BitbucketService', () => {
       expect(result[0].name).toBe('repo1');
       expect(result[1].name).toBe('repo2');
     });
+
+    it('should return repositories for a self-hosted project', async () => {
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          isLastPage: true,
+          values: [
+            {
+              name: 'repo1',
+              slug: 'repo1',
+              archived: false,
+              public: true,
+              defaultBranch: { displayId: 'main' },
+              links: {
+                self: [{ href: 'https://bitbucket.example.com/projects/PROJ/repos/repo1/browse' }],
+                clone: [{ name: 'http', href: 'https://bitbucket.example.com/scm/proj/repo1.git' }],
+              },
+            },
+          ],
+        })
+      );
+
+      const service = new BitbucketService(
+        createDefaultConfig({
+          platform: VcsPlatform.BITBUCKET_SELF_HOSTED,
+          host: 'https://bitbucket.example.com',
+        })
+      );
+
+      const result = await service.getRepositories('PROJ');
+      expect(result).toHaveLength(1);
+      expect(result[0].fullName).toBe('PROJ/repo1');
+      expect(result[0].private).toBe(false);
+    });
   });
 
   describe('findIacFilesInRepository', () => {
@@ -190,6 +278,51 @@ describe('BitbucketService', () => {
 
       expect(files).toHaveLength(2);
       expect(files.map(file => file.path)).toEqual(['main.tf', 'modules/vpc.tf']);
+    });
+
+    it('should discover IaC files in self-hosted repository and return file content', async () => {
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            isLastPage: true,
+            values: ['main.tf', 'docs/readme.md', 'modules/vpc.tf'],
+          })
+        )
+        .mockResolvedValueOnce(createMockResponse('resource "aws_vpc" "main" {}', 200))
+        .mockResolvedValueOnce(createMockResponse('module "vpc" {}', 200));
+
+      const service = new BitbucketService(
+        createDefaultConfig({
+          platform: VcsPlatform.BITBUCKET_SELF_HOSTED,
+          host: 'https://bitbucket.example.com',
+        })
+      );
+
+      const repository = {
+        owner: 'PROJ',
+        name: 'myrepo',
+        fullName: 'PROJ/myrepo',
+        defaultBranch: 'main',
+        archived: false,
+        private: true,
+        url: 'https://bitbucket.example.com/projects/PROJ/repos/myrepo',
+        cloneUrl: 'https://bitbucket.example.com/scm/proj/myrepo.git',
+      };
+
+      const files = await service.findIacFilesInRepository(repository, {
+        fileTypes: ['terraform', 'terragrunt'],
+      });
+
+      expect(files).toHaveLength(2);
+      expect(files.map(file => file.path)).toEqual(['main.tf', 'modules/vpc.tf']);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/rest/api/latest/projects/PROJ/repos/myrepo/files'),
+        expect.any(Object)
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/rest/api/latest/projects/PROJ/repos/myrepo/raw/main.tf'),
+        expect.any(Object)
+      );
     });
   });
 });

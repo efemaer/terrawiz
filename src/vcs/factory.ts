@@ -49,13 +49,8 @@ export class VcsServiceFactory {
         return VcsServiceFactory.createAzureDevOpsService(config);
 
       case VcsPlatform.BITBUCKET:
-        return VcsServiceFactory.createBitbucketService(config);
-
       case VcsPlatform.BITBUCKET_SELF_HOSTED:
-        throw new Error(
-          `Platform ${config.platform} is not yet supported. ` +
-            `Bitbucket Cloud is supported via "bitbucket:workspace[/repo]".`
-        );
+        return VcsServiceFactory.createBitbucketService(config);
 
       case VcsPlatform.LOCAL:
         throw new Error(
@@ -128,7 +123,7 @@ export class VcsServiceFactory {
     const bitbucketConfig: BitbucketServiceConfig = {
       platform: config.platform, // Can be BITBUCKET or BITBUCKET_SELF_HOSTED
       token: config.bitbucketToken || process.env.BITBUCKET_TOKEN || '',
-      host: config.bitbucketHost,
+      host: config.bitbucketHost || process.env.BITBUCKET_HOST,
       debug: config.debug,
       skipArchived: config.skipArchived,
       maxRetries: config.maxRetries,
@@ -151,6 +146,7 @@ export class VcsServiceFactory {
       VcsPlatform.AZURE_DEVOPS,
       VcsPlatform.AZURE_DEVOPS_SELF_HOSTED,
       VcsPlatform.BITBUCKET,
+      VcsPlatform.BITBUCKET_SELF_HOSTED,
     ];
   }
   static isPlatformSupported(platform: VcsPlatform): boolean {
