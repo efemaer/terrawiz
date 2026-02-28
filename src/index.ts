@@ -105,6 +105,8 @@ program
         logger.error('Examples:');
         logger.error('  terrawiz scan github:myorg');
         logger.error('  terrawiz scan gitlab:mygroup');
+        logger.error('  terrawiz scan azure:myorg/myproject');
+        logger.error('  terrawiz scan bitbucket:myworkspace');
         logger.error('  terrawiz scan gitlab://gitlab.company.com/mygroup');
         logger.error('  terrawiz scan github:myorg/myrepo');
         logger.error('  terrawiz scan local:/path/to/directory');
@@ -220,6 +222,10 @@ program
           githubHost: parsedSource.host,
           gitlabToken: process.env.GITLAB_TOKEN,
           gitlabHost: parsedSource.host,
+          azureDevopsToken: process.env.AZURE_DEVOPS_TOKEN,
+          azureDevopsHost: parsedSource.host,
+          bitbucketToken: process.env.BITBUCKET_TOKEN,
+          bitbucketHost: parsedSource.host,
           useRateLimit: !options.disableRateLimit,
           repoPattern: options.pattern,
           iacFileTypes,

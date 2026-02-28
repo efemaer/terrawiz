@@ -25,6 +25,8 @@
     "terragrunt",
     "github",
     "gitlab",
+    "azure-devops",
+    "bitbucket",
     "modules",
     "tracking",
     "iac",
@@ -33,7 +35,7 @@
   "author": "Mansour Kheffache",
   "repository": "github:efemaer/terrawiz",
   "license": "MIT",
-  "description": "A tool to track and analyze Terraform modules used in GitHub and GitLab repositories",
+  "description": "A tool to track and analyze Terraform modules used in GitHub, GitLab, Azure DevOps, and Bitbucket repositories",
   "engines": {
     "node": ">=24"
   },

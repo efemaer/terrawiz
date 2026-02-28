@@ -92,6 +92,43 @@ describe('Source Parser', () => {
       });
     });
 
+    describe('Azure DevOps sources', () => {
+      it('should parse Azure DevOps organization', () => {
+        const result = parseSource('azure:myorg');
+        expect(result).toEqual({
+          platform: VcsPlatform.AZURE_DEVOPS,
+          identifier: 'myorg',
+          repository: undefined,
+          originalInput: 'azure:myorg',
+        });
+      });
+
+      it('should parse Azure DevOps organization with project', () => {
+        const result = parseSource('azure:myorg/myproject');
+        expect(result).toEqual({
+          platform: VcsPlatform.AZURE_DEVOPS,
+          identifier: 'myorg/myproject',
+          repository: undefined,
+          originalInput: 'azure:myorg/myproject',
+        });
+      });
+
+      it('should parse Azure DevOps organization with project and repository', () => {
+        const result = parseSource('azure:myorg/myproject/myrepo');
+        expect(result).toEqual({
+          platform: VcsPlatform.AZURE_DEVOPS,
+          identifier: 'myorg/myproject',
+          repository: 'myrepo',
+          originalInput: 'azure:myorg/myproject/myrepo',
+        });
+      });
+
+      it('should handle Azure DevOps aliases', () => {
+        expect(parseSource('azdo:myorg').platform).toBe(VcsPlatform.AZURE_DEVOPS);
+        expect(parseSource('ado:myorg').platform).toBe(VcsPlatform.AZURE_DEVOPS);
+      });
+    });
+
     describe('Local sources', () => {
       it('should parse absolute local path', () => {
         const result = parseSource('local:/path/to/directory');
@@ -203,6 +240,54 @@ describe('Source Parser', () => {
       });
     });
 
+    describe('Bitbucket URL format', () => {
+      it('should parse Bitbucket cloud URL format', () => {
+        const result = parseSource('bitbucket://bitbucket.org/my-workspace/my-repo');
+        expect(result).toEqual({
+          platform: VcsPlatform.BITBUCKET,
+          identifier: 'my-workspace',
+          repository: 'my-repo',
+          host: 'https://bitbucket.org',
+          originalInput: 'bitbucket://bitbucket.org/my-workspace/my-repo',
+        });
+      });
+
+      it('should parse Bitbucket self-hosted URL format', () => {
+        const result = parseSource('bitbucket://bitbucket.example.com/my-workspace/my-repo');
+        expect(result).toEqual({
+          platform: VcsPlatform.BITBUCKET_SELF_HOSTED,
+          identifier: 'my-workspace',
+          repository: 'my-repo',
+          host: 'https://bitbucket.example.com',
+          originalInput: 'bitbucket://bitbucket.example.com/my-workspace/my-repo',
+        });
+      });
+    });
+
+    describe('Azure DevOps URL format', () => {
+      it('should parse Azure DevOps cloud URL format', () => {
+        const result = parseSource('azure://dev.azure.com/my-org/my-project/my-repo');
+        expect(result).toEqual({
+          platform: VcsPlatform.AZURE_DEVOPS,
+          identifier: 'my-org/my-project',
+          repository: 'my-repo',
+          host: 'https://dev.azure.com',
+          originalInput: 'azure://dev.azure.com/my-org/my-project/my-repo',
+        });
+      });
+
+      it('should parse Azure DevOps self-hosted URL format', () => {
+        const result = parseSource('azure://azure.example.com/my-org/my-project/my-repo');
+        expect(result).toEqual({
+          platform: VcsPlatform.AZURE_DEVOPS_SELF_HOSTED,
+          identifier: 'my-org/my-project',
+          repository: 'my-repo',
+          host: 'https://azure.example.com',
+          originalInput: 'azure://azure.example.com/my-org/my-project/my-repo',
+        });
+      });
+    });
+
     describe('Error cases', () => {
       it('should throw error for empty source', () => {
         expect(() => parseSource('')).toThrow('Source must be a non-empty string');
@@ -274,6 +359,10 @@ describe('Source Parser', () => {
       expect(getPlatformDisplayName(VcsPlatform.GITHUB_SELF_HOSTED)).toBe('GitHub Self-Hosted');
       expect(getPlatformDisplayName(VcsPlatform.GITLAB)).toBe('GitLab');
       expect(getPlatformDisplayName(VcsPlatform.GITLAB_SELF_HOSTED)).toBe('GitLab Self-Hosted');
+      expect(getPlatformDisplayName(VcsPlatform.AZURE_DEVOPS)).toBe('Azure DevOps');
+      expect(getPlatformDisplayName(VcsPlatform.AZURE_DEVOPS_SELF_HOSTED)).toBe(
+        'Azure DevOps Self-Hosted'
+      );
       expect(getPlatformDisplayName(VcsPlatform.BITBUCKET)).toBe('Bitbucket');
       expect(getPlatformDisplayName(VcsPlatform.BITBUCKET_SELF_HOSTED)).toBe(
         'Bitbucket Self-Hosted'

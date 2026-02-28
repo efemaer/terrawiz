@@ -1,6 +1,6 @@
 # Terrawiz
 
-Discover and analyze Terraform and Terragrunt modules across GitHub, GitLab, and local filesystems. Terrawiz gives you clear visibility into IaC usage: inventory modules, track versions, and export reports.
+Discover and analyze Terraform and Terragrunt modules across GitHub, GitLab, Azure DevOps, Bitbucket, and local filesystems. Terrawiz gives you clear visibility into IaC usage: inventory modules, track versions, and export reports.
 
 [![npm version](https://img.shields.io/npm/v/terrawiz.svg)](https://www.npmjs.com/package/terrawiz)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/efemaer/terrawiz)
@@ -117,6 +117,16 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
   - Scope: `read_api` (or `api`) for private projects; sufficient rights to list projects and read files.
   - Self‑hosted GitLab uses the same `GITLAB_TOKEN`; include the host in the source (e.g., `gitlab://gitlab.company.com/group`).
 
+- Azure DevOps
+  - Env var: `AZURE_DEVOPS_TOKEN` (required)
+  - Scope: a PAT with read access to code repositories (`Code (Read)`).
+  - Examples: `azure:organization/project`, `azure:organization/project/repository`.
+
+- Bitbucket
+  - Env var: `BITBUCKET_TOKEN` (required)
+  - Use an OAuth bearer token, or set `BITBUCKET_TOKEN` to `username:app_password` for app-password auth.
+  - Examples: `bitbucket:workspace`, `bitbucket:workspace/repository`.
+
 - Local
   - No authentication required for `local:` sources.
 
@@ -136,8 +146,11 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
     - GitHub Enterprise: `github://host/org` or `github://host/org/repo`
     - GitLab (cloud): `gitlab:group` or `gitlab:group/project`
     - GitLab Self‑Hosted: `gitlab://host/group` or `gitlab://host/group/project`
+    - Azure DevOps: `azure:organization`, `azure:organization/project`, or `azure:organization/project/repository`
+    - Azure DevOps Self‑Hosted: `azure://host/organization/project` or `azure://host/organization/project/repository`
+    - Bitbucket (cloud): `bitbucket:workspace` or `bitbucket:workspace/repository`
+    - Note: Bitbucket self-hosted (Server/Data Center) is not supported yet.
     - Local filesystem: `local:.`, `local:/abs/path`, `local:./relative/path`
-    - Note: Bitbucket is not supported yet.
 
 - Options
   - `-f, --format <format>` — Output format: `table` (default), `json`, `csv`
@@ -168,6 +181,7 @@ git::ssh://git@github.com/hashicorp-modules/hashistack-gcp,git,terraform,,hashic
 - Enterprise/self‑hosted targets
   - GitHub Enterprise: `github://github.company.com/org`
   - GitLab self‑hosted: `gitlab://gitlab.company.com/group`
+  - Azure DevOps self‑hosted: `azure://azure.company.com/org/project`
 
 - Local scanning
   - Scan current project: `terrawiz scan local:.`
