@@ -11,21 +11,21 @@ export function isNotFoundError(error: unknown, platform: VcsPlatform): boolean 
   if (platform === VcsPlatform.GITHUB || platform === VcsPlatform.GITHUB_SELF_HOSTED) {
     return Boolean(
       error &&
-        typeof error === 'object' &&
-        'status' in error &&
-        (error as { status: number }).status === 404
+      typeof error === 'object' &&
+      'status' in error &&
+      (error as { status: number }).status === 404
     );
   }
 
   if (platform === VcsPlatform.GITLAB || platform === VcsPlatform.GITLAB_SELF_HOSTED) {
     return Boolean(
       error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        error.response &&
-        typeof error.response === 'object' &&
-        'status' in error.response &&
-        (error.response as { status: number }).status === 404
+      typeof error === 'object' &&
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'status' in error.response &&
+      (error.response as { status: number }).status === 404
     );
   }
 
@@ -39,21 +39,21 @@ export function isRateLimitError(error: unknown, platform: VcsPlatform): boolean
   if (platform === VcsPlatform.GITHUB || platform === VcsPlatform.GITHUB_SELF_HOSTED) {
     return Boolean(
       error &&
-        typeof error === 'object' &&
-        'status' in error &&
-        (error as { status: number }).status === 429
+      typeof error === 'object' &&
+      'status' in error &&
+      (error as { status: number }).status === 429
     );
   }
 
   if (platform === VcsPlatform.GITLAB || platform === VcsPlatform.GITLAB_SELF_HOSTED) {
     return Boolean(
       error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        error.response &&
-        typeof error.response === 'object' &&
-        'status' in error.response &&
-        (error.response as { status: number }).status === 429
+      typeof error === 'object' &&
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'status' in error.response &&
+      (error.response as { status: number }).status === 429
     );
   }
 
@@ -69,21 +69,21 @@ export function isAuthError(error: unknown, platform: VcsPlatform): boolean {
   if (platform === VcsPlatform.GITHUB || platform === VcsPlatform.GITHUB_SELF_HOSTED) {
     return Boolean(
       error &&
-        typeof error === 'object' &&
-        'status' in error &&
-        statusCodes.includes((error as { status: number }).status)
+      typeof error === 'object' &&
+      'status' in error &&
+      statusCodes.includes((error as { status: number }).status)
     );
   }
 
   if (platform === VcsPlatform.GITLAB || platform === VcsPlatform.GITLAB_SELF_HOSTED) {
     return Boolean(
       error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        error.response &&
-        typeof error.response === 'object' &&
-        'status' in error.response &&
-        statusCodes.includes((error.response as { status: number }).status)
+      typeof error === 'object' &&
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'status' in error.response &&
+      statusCodes.includes((error.response as { status: number }).status)
     );
   }
 
